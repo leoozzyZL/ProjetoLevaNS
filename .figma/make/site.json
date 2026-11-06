@@ -1,0 +1,10 @@
+{
+  "description": "Organize and explore all your data in one place with an intuitive interface designed to make information easier to access and use.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
