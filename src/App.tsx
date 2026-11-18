@@ -1,4 +1,7 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import AuthDialog, { type AccountRole, type AuthMode } from "./components/AuthDialog";
+import { supabase } from "./lib/supabase";
 
 type IconName =
   | "arrow"
@@ -250,6 +253,33 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
   const [referencesOpen, setReferencesOpen] = useState(false);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [authRole, setAuthRole] = useState<AccountRole>("Passageiro");
+  const [pendingInterest, setPendingInterest] = useState("");
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthUser((current) => current ?? data.session?.user ?? null);
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setAuthUser(session?.user ?? null);
+      if (event === "PASSWORD_RECOVERY") {
+        setAuthMode("update-password");
+        setAuthOpen(true);
+      }
+    });
+
+    if (new URLSearchParams(window.location.search).get("auth") === "update-password") {
+      setAuthMode("update-password");
+      setAuthOpen(true);
+    }
+
+    return () => authListener.subscription.unsubscribe();
+  }, []);
 
   const filteredPartners = useMemo(
     () =>
@@ -269,6 +299,33 @@ export default function App() {
   function showToast(message: string) {
     setToast(message);
     window.setTimeout(() => setToast(""), 3200);
+  }
+
+  function openAuth(mode: AuthMode, role: AccountRole = "Passageiro", interest = "") {
+    setAuthMode(authUser ? "account" : mode);
+    setAuthRole(role);
+    setPendingInterest(interest);
+    setAuthOpen(true);
+    setMenu(false);
+  }
+
+  async function recordInterest(interest: string, role: AccountRole = "Passageiro") {
+    if (!authUser || !supabase) {
+      openAuth("signup", role, interest);
+      return;
+    }
+
+    const current = Array.isArray(authUser.user_metadata?.interests)
+      ? (authUser.user_metadata.interests as string[])
+      : [];
+    const interests = [...new Set([...current, interest])];
+    const { data, error } = await supabase.auth.updateUser({ data: { interests } });
+    if (error || !data.user) {
+      showToast("Não foi possível salvar esse interesse. Tente novamente.");
+      return;
+    }
+    setAuthUser(data.user);
+    showToast(`Interesse em ${interest} salvo na sua conta.`);
   }
 
   function submitTrip(event: FormEvent) {
@@ -294,16 +351,28 @@ export default function App() {
           <button onClick={() => scrollTo("beneficios")}>Benefícios</button>
           <button onClick={() => scrollTo("seguranca")}>Segurança</button>
           <button onClick={() => scrollTo("planos")}>Planos</button>
+          <button
+            className="mobile-auth-link"
+            onClick={() => openAuth(authUser ? "account" : "login")}
+          >
+            {authUser ? "Minha conta" : "Entrar"}
+          </button>
+          <button
+            className="mobile-create-account"
+            onClick={() => openAuth(authUser ? "account" : "signup")}
+          >
+            {authUser ? "Ver conta" : "Criar conta"}
+          </button>
         </nav>
         <div className="header-actions">
-          <button
-            className="link-button"
-            onClick={() => showToast("A área de acesso estará disponível no lançamento.")}
-          >
-            Entrar
+          <button className="link-button" onClick={() => openAuth(authUser ? "account" : "login")}>
+            {authUser ? "Minha conta" : "Entrar"}
           </button>
-          <button className="primary small" onClick={() => scrollTo("cadastro")}>
-            Quero participar
+          <button
+            className="primary small"
+            onClick={() => openAuth(authUser ? "account" : "signup")}
+          >
+            {authUser ? "Ver conta" : "Criar conta"}
           </button>
           <button
             className="menu-button"
@@ -434,11 +503,7 @@ export default function App() {
                   </div>
                   <button
                     className="primary full"
-                    onClick={() =>
-                      showToast(
-                        "Interesse registrado. Avisaremos quando o piloto chegar à sua região.",
-                      )
-                    }
+                    onClick={() => recordInterest("Piloto de viagens")}
                   >
                     Tenho interesse no piloto <Icon name="arrow" />
                   </button>
@@ -462,7 +527,7 @@ export default function App() {
                   <strong>3%</strong>
                   <span>comissão inicial após a isenção*</span>
                 </div>
-                <button className="primary full" onClick={() => scrollTo("cadastro")}>
+                <button className="primary full" onClick={() => openAuth("signup", "Motorista")}>
                   Quero dirigir <Icon name="arrow" />
                 </button>
                 <small className="availability">
@@ -528,10 +593,10 @@ export default function App() {
                 <button
                   onClick={() =>
                     index === 0
-                      ? scrollTo("inicio")
+                      ? (setAudience("passageiro"), scrollTo("inicio"))
                       : index === 1
-                        ? setAudience("motorista")
-                        : scrollTo("cadastro")
+                        ? (setAudience("motorista"), scrollTo("inicio"))
+                        : openAuth("signup", "Parceiro local")
                   }
                 >
                   {action} <Icon name="arrow" size={17} />
@@ -591,7 +656,7 @@ export default function App() {
                 />
               </label>
               <div className="filters" aria-label="Filtrar categorias">
-                {["Todos", "Veículos", "Crédito", "Manutenção", "Seguro"].map((item) => (
+                {["Todos", ...new Set(partners.map((partner) => partner.category))].map((item) => (
                   <button
                     className={filter === item ? "active" : ""}
                     onClick={() => setFilter(item)}
@@ -616,8 +681,9 @@ export default function App() {
                   <p>{partner.text}</p>
                   <button
                     onClick={() =>
-                      showToast(
-                        `${partner.category}: avisaremos quando houver parceiros disponíveis.`,
+                      recordInterest(
+                        `Benefício: ${partner.category}`,
+                        partner.category === "Universidades" ? "Universidade" : "Motorista",
                       )
                     }
                   >
@@ -766,7 +832,7 @@ export default function App() {
                 </ul>
                 <button
                   className={index === 1 ? "primary full" : "secondary full"}
-                  onClick={() => showToast(`Interesse no plano ${name} registrado.`)}
+                  onClick={() => recordInterest(`Plano: ${name as string}`)}
                 >
                   Tenho interesse
                 </button>
@@ -885,31 +951,16 @@ export default function App() {
             </h2>
             <p>Universidades, parceiros e comunidade conectados a novas possibilidades.</p>
           </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              showToast("Interesse registrado. Obrigado por fazer parte do começo!");
-              (e.currentTarget as HTMLFormElement).reset();
-            }}
-          >
-            <label>
-              <span>Seu e-mail</span>
-              <input type="email" placeholder="voce@email.com" required />
-            </label>
-            <label>
-              <span>Quero participar como</span>
-              <select defaultValue="Passageiro">
-                <option>Passageiro</option>
-                <option>Motorista</option>
-                <option>Parceiro local</option>
-                <option>Universidade</option>
-              </select>
-            </label>
-            <button className="primary light-button" type="submit">
-              Registrar interesse <Icon name="arrow" />
+          <div className="cta-auth">
+            <strong>Comece com um cadastro gratuito.</strong>
+            <p>Escolha seu perfil, crie sua conta e salve os benefícios que quer acompanhar.</p>
+            <button className="primary light-button" onClick={() => openAuth("signup")}>
+              Criar minha conta <Icon name="arrow" />
             </button>
-            <small>Ao enviar, você concorda em receber novidades sobre o projeto.</small>
-          </form>
+            <button className="cta-login" onClick={() => openAuth("login")}>
+              Já tenho uma conta
+            </button>
+          </div>
         </section>
       </main>
 
@@ -932,13 +983,13 @@ export default function App() {
             <strong>Projeto</strong>
             <button onClick={() => scrollTo("planos")}>Planos</button>
             <button onClick={() => setReferencesOpen(!referencesOpen)}>Referências</button>
-            <button onClick={() => scrollTo("cadastro")}>Participar</button>
+            <button onClick={() => openAuth("signup")}>Participar</button>
           </div>
           <div className="academic-note">
             <strong>Projeto acadêmico</strong>
             <p>
-              Conceito desenvolvido por João Moura. Funcionalidades e condições descritas compõem
-              uma proposta de desenvolvimento.
+              Conceito desenvolvido por João Moura. Viagens, tarifas e disponibilidade ainda são uma
+              proposta para lançamento.
             </p>
           </div>
         </div>
@@ -975,6 +1026,16 @@ export default function App() {
           </button>
         </div>
       )}
+
+      <AuthDialog
+        open={authOpen}
+        initialMode={authMode}
+        initialRole={authRole}
+        pendingInterest={pendingInterest}
+        user={authUser}
+        onClose={() => setAuthOpen(false)}
+        onModeChange={setAuthMode}
+      />
     </div>
   );
 }
