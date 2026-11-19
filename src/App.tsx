@@ -792,24 +792,31 @@ export default function App() {
             {[
               [
                 "Essencial",
-                "Acesso básico",
-                ["Aplicativo e extrato", "Ofertas básicas dos parceiros"],
+                "Acesso gratuito",
+                "Para começar sem mensalidade e acompanhar as funções essenciais da plataforma.",
+                ["Aplicativo e extrato", "Ofertas básicas dos parceiros disponíveis"],
               ],
               [
                 "Mais",
                 "Assinatura opcional",
-                ["Tudo do Essencial", "Benefícios adicionais", "Campanhas elegíveis"],
+                "Para quem quer ampliar as vantagens disponíveis na rotina.",
+                [
+                  "Tudo do Essencial",
+                  "Benefícios adicionais conforme a rede disponível",
+                  "Campanhas para usuários elegíveis",
+                ],
               ],
               [
                 "Completo",
                 "Assinatura opcional",
+                "Para quem busca a rede mais ampla de parceiros e benefícios.",
                 [
                   "Tudo do Mais",
-                  "Rede ampliada de benefícios",
+                  "Rede ampliada de parceiros e benefícios",
                   "Condições em parceiros selecionados",
                 ],
               ],
-            ].map(([name, subtitle, items], index) => (
+            ].map(([name, subtitle, description, items], index) => (
               <article
                 className={`plan-card ${index === 1 ? "featured" : ""}`}
                 key={name as string}
@@ -821,6 +828,7 @@ export default function App() {
                   </span>
                   <h3>{name as string}</h3>
                   <p>{subtitle as string}</p>
+                  <p className="plan-description">{description as string}</p>
                 </div>
                 <ul>
                   {(items as string[]).map((item) => (
