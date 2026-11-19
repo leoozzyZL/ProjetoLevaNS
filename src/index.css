@@ -1092,6 +1092,13 @@
   color: var(--muted);
   font-size: 12px;
 }
+.plan-description {
+  color: #52697f;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 10px;
+  min-height: 58px;
+}
 .plan-card ul {
   flex: 1;
   margin: 25px 0;
