@@ -269,7 +269,7 @@ async function geocodePlace(query: string, bias?: PlaceCoordinates): Promise<Geo
   const url = new URL("https://photon.komoot.io/api/");
   url.searchParams.set("q", query);
   url.searchParams.set("limit", "1");
-  url.searchParams.set("lang", "pt");
+  url.searchParams.set("lang", "default");
   if (bias) {
     url.searchParams.set("lat", String(bias.lat));
     url.searchParams.set("lon", String(bias.lon));
