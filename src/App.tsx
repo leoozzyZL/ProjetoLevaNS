@@ -265,15 +265,27 @@ const REFERENCE_DISTANCE_KM = 10;
 const SERVICE_FEE = 1;
 const ESTIMATED_PRICE_PER_KM = REFERENCE_TICKET / REFERENCE_DISTANCE_KM;
 
+const NATAL_CENTER: PlaceCoordinates = { lat: -5.78, lon: -35.20 };
+const NATAL_BOUNDS = { west: -35.32, south: -5.95, east: -35.12, north: -5.66 };
+
+function normalizePlaceName(value = "") {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+}
+
 async function geocodePlace(query: string, bias?: PlaceCoordinates): Promise<GeocodedPlace> {
   const url = new URL("https://photon.komoot.io/api/");
-  url.searchParams.set("q", query);
-  url.searchParams.set("limit", "1");
+  url.searchParams.set("q", query.trim() + ", Natal, Rio Grande do Norte, Brasil");
+  url.searchParams.set("limit", "5");
   url.searchParams.set("lang", "default");
-  if (bias) {
-    url.searchParams.set("lat", String(bias.lat));
-    url.searchParams.set("lon", String(bias.lon));
-  }
+  url.searchParams.set("countrycode", "br");
+  url.searchParams.set("bbox", NATAL_BOUNDS.west + "," + NATAL_BOUNDS.south + "," + NATAL_BOUNDS.east + "," + NATAL_BOUNDS.north);
+  url.searchParams.set("lat", String(bias?.lat ?? NATAL_CENTER.lat));
+  url.searchParams.set("lon", String(bias?.lon ?? NATAL_CENTER.lon));
+  url.searchParams.set("location_bias_scale", "0.1");
 
   const response = await fetch(url);
   if (!response.ok) throw new Error("Não foi possível localizar esse endereço.");
@@ -285,23 +297,43 @@ async function geocodePlace(query: string, bias?: PlaceCoordinates): Promise<Geo
         name?: string;
         district?: string;
         city?: string;
+        county?: string;
         state?: string;
+        country?: string;
+        countrycode?: string;
       };
     }>;
   };
-  const feature = data.features?.[0];
+  const feature = data.features?.find((result) => {
+    const properties = result.properties ?? {};
+    const coordinates = result.geometry?.coordinates;
+    const locality = properties.city ?? properties.county;
+    const inNatalBounds = Boolean(
+      coordinates &&
+      coordinates[0] >= NATAL_BOUNDS.west &&
+      coordinates[0] <= NATAL_BOUNDS.east &&
+      coordinates[1] >= NATAL_BOUNDS.south &&
+      coordinates[1] <= NATAL_BOUNDS.north,
+    );
+
+    return (
+      properties.countrycode?.toUpperCase() === "BR" &&
+      normalizePlaceName(locality) === "natal" &&
+      normalizePlaceName(properties.state) === "rio grande do norte" &&
+      inNatalBounds
+    );
+  });
   const coordinates = feature?.geometry?.coordinates;
-  if (!coordinates || coordinates.length < 2) {
-    throw new Error("Não localizamos esse endereço. Informe também o bairro e a cidade.");
+  if (!feature || !coordinates || coordinates.length < 2) {
+    throw new Error("A simulação atende somente endereços de Natal, RN. Informe um local e seu bairro.");
   }
 
   const properties = feature.properties ?? {};
-  const label = [...new Set([properties.name, properties.district, properties.city, properties.state].filter(Boolean))]
+  const label = [...new Set([properties.name, properties.district, properties.city ?? properties.county, properties.state].filter(Boolean))]
     .join(", ") || query;
 
   return { label, lon: coordinates[0], lat: coordinates[1] };
 }
-
 async function estimateTrip(origin: string, destination: string): Promise<TripEstimate> {
   const originPlace = await geocodePlace(origin);
   const destinationPlace = await geocodePlace(destination, originPlace);
@@ -555,7 +587,7 @@ export default function App() {
                       <input
                         value={origin}
                         onChange={(e) => setOrigin(e.target.value)}
-                        placeholder="Ex.: Campus Benfica, Fortaleza"
+                        placeholder="Ex.: Midway Mall, Tirol"
                         aria-label="Local de partida"
                         autoComplete="street-address"
                         required
@@ -569,7 +601,7 @@ export default function App() {
                       <input
                         value={destination}
                         onChange={(e) => setDestination(e.target.value)}
-                        placeholder="Ex.: Shopping Benfica, Fortaleza"
+                        placeholder="Ex.: UFRN, Lagoa Nova"
                         aria-label="Destino"
                         required
                       />
@@ -600,8 +632,7 @@ export default function App() {
                     </p>
                   )}
                   <small className="availability">
-                    Os locais são consultados no Photon e as coordenadas seguem ao OSRM para calcular
-                    a rota. Use locais aproximados se preferir.
+                    A simulação aceita somente endereços em Natal, RN. Informe o local e o bairro.
                   </small>
                 </form>
               ) : (
