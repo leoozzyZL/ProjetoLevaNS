@@ -243,10 +243,106 @@ const references = [
   "Reclame Aqui / Bloqueio Uber",
 ];
 
+type PlaceCoordinates = {
+  lat: number;
+  lon: number;
+};
+
+type GeocodedPlace = PlaceCoordinates & {
+  label: string;
+};
+
+type TripEstimate = {
+  origin: string;
+  destination: string;
+  distanceKm: number;
+  durationMinutes: number;
+  price: number;
+};
+
+const REFERENCE_TICKET = 20;
+const REFERENCE_DISTANCE_KM = 10;
+const SERVICE_FEE = 1;
+const ESTIMATED_PRICE_PER_KM = REFERENCE_TICKET / REFERENCE_DISTANCE_KM;
+
+async function geocodePlace(query: string, bias?: PlaceCoordinates): Promise<GeocodedPlace> {
+  const url = new URL("https://photon.komoot.io/api/");
+  url.searchParams.set("q", query);
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("lang", "pt");
+  if (bias) {
+    url.searchParams.set("lat", String(bias.lat));
+    url.searchParams.set("lon", String(bias.lon));
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Não foi possível localizar esse endereço.");
+
+  const data = (await response.json()) as {
+    features?: Array<{
+      geometry?: { coordinates?: [number, number] };
+      properties?: {
+        name?: string;
+        district?: string;
+        city?: string;
+        state?: string;
+      };
+    }>;
+  };
+  const feature = data.features?.[0];
+  const coordinates = feature?.geometry?.coordinates;
+  if (!coordinates || coordinates.length < 2) {
+    throw new Error("Não localizamos esse endereço. Informe também o bairro e a cidade.");
+  }
+
+  const properties = feature.properties ?? {};
+  const label = [...new Set([properties.name, properties.district, properties.city, properties.state].filter(Boolean))]
+    .join(", ") || query;
+
+  return { label, lon: coordinates[0], lat: coordinates[1] };
+}
+
+async function estimateTrip(origin: string, destination: string): Promise<TripEstimate> {
+  const originPlace = await geocodePlace(origin);
+  const destinationPlace = await geocodePlace(destination, originPlace);
+  const routeUrl = new URL(
+    "https://router.project-osrm.org/route/v1/driving/" +
+      originPlace.lon + "," + originPlace.lat + ";" + destinationPlace.lon + "," + destinationPlace.lat,
+  );
+  routeUrl.searchParams.set("overview", "false");
+
+  const response = await fetch(routeUrl);
+  if (!response.ok) throw new Error("Não foi possível calcular essa rota agora.");
+
+  const data = (await response.json()) as {
+    code?: string;
+    routes?: Array<{ distance: number; duration: number }>;
+  };
+  const route = data.routes?.[0];
+  if (data.code !== "Ok" || !route) {
+    throw new Error("Não encontramos uma rota de carro entre esses locais.");
+  }
+
+  const distanceKm = route.distance / 1000;
+  const price = Math.round((distanceKm * ESTIMATED_PRICE_PER_KM + SERVICE_FEE) * 100) / 100;
+
+  return {
+    origin: originPlace.label,
+    destination: destinationPlace.label,
+    distanceKm,
+    durationMinutes: Math.max(1, Math.ceil(route.duration / 60)),
+    price,
+  };
+}
+
 export default function App() {
   const [audience, setAudience] = useState<"passageiro" | "motorista">("passageiro");
+  const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [trip, setTrip] = useState(false);
+  const [tripLoading, setTripLoading] = useState(false);
+  const [tripError, setTripError] = useState("");
+  const [tripEstimate, setTripEstimate] = useState<TripEstimate | null>(null);
   const [women, setWomen] = useState(false);
   const [menu, setMenu] = useState(false);
   const [filter, setFilter] = useState("Todos");
@@ -328,10 +424,26 @@ export default function App() {
     showToast(`Interesse em ${interest} salvo na sua conta.`);
   }
 
-  function submitTrip(event: FormEvent) {
+  async function submitTrip(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!destination.trim()) return;
-    setTrip(true);
+    if (!origin.trim() || !destination.trim()) return;
+
+    setTripLoading(true);
+    setTripError("");
+    setTripEstimate(null);
+    try {
+      const estimate = await estimateTrip(origin.trim(), destination.trim());
+      setTripEstimate(estimate);
+      setTrip(true);
+    } catch (error) {
+      setTripError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível calcular essa rota. Confira os locais e tente novamente.",
+      );
+    } finally {
+      setTripLoading(false);
+    }
   }
 
   function scrollTo(id: string) {
@@ -440,7 +552,14 @@ export default function App() {
                     <Icon name="home" />
                     <span>
                       <small>Partida</small>
-                      <input value="Minha localização" readOnly aria-label="Local de partida" />
+                      <input
+                        value={origin}
+                        onChange={(e) => setOrigin(e.target.value)}
+                        placeholder="Ex.: Campus Benfica, Fortaleza"
+                        aria-label="Local de partida"
+                        autoComplete="street-address"
+                        required
+                      />
                     </span>
                   </label>
                   <label className="field">
@@ -450,7 +569,7 @@ export default function App() {
                       <input
                         value={destination}
                         onChange={(e) => setDestination(e.target.value)}
-                        placeholder="Digite seu destino"
+                        placeholder="Ex.: Shopping Benfica, Fortaleza"
                         aria-label="Destino"
                         required
                       />
@@ -471,11 +590,18 @@ export default function App() {
                     />
                     <i />
                   </label>
-                  <button className="primary full" type="submit">
-                    Ver opções de viagem <Icon name="arrow" />
+                  <button className="primary full" type="submit" disabled={tripLoading}>
+                    {tripLoading ? "Calculando estimativa..." : "Calcular estimativa"}
+                    {!tripLoading && <Icon name="arrow" />}
                   </button>
+                  {tripError && (
+                    <p className="route-error" role="alert">
+                      {tripError}
+                    </p>
+                  )}
                   <small className="availability">
-                    A disponibilidade varia conforme a região e o horário.
+                    Os locais são consultados no Photon e as coordenadas seguem ao OSRM para calcular
+                    a rota. Use locais aproximados se preferir.
                   </small>
                 </form>
               ) : (
@@ -486,29 +612,50 @@ export default function App() {
                   <div className="result-route">
                     <Icon name="route" size={32} />
                     <span>
-                      <small>Destino</small>
-                      <strong>{destination}</strong>
+                      <small>
+                        {tripEstimate?.distanceKm.toLocaleString("pt-BR", {
+                          maximumFractionDigits: 1,
+                          minimumFractionDigits: 1,
+                        })} km • {tripEstimate?.durationMinutes} min estimados
+                      </small>
+                      <strong>
+                        {tripEstimate?.origin} → {tripEstimate?.destination}
+                      </strong>
                     </span>
                   </div>
-                  <h2>Opção encontrada</h2>
+                  <h2>Estimativa de viagem</h2>
                   <div className="ride-option">
                     <span className="car-badge">
                       <Icon name="car" size={26} />
                     </span>
                     <span>
                       <strong>{women ? "Leva Nós Mulheres" : "Leva Nós Essencial"}</strong>
-                      <small>4 min • 4 lugares</small>
+                      <small>
+                        Rota de carro • {tripEstimate?.distanceKm.toLocaleString("pt-BR", {
+                          maximumFractionDigits: 1,
+                          minimumFractionDigits: 1,
+                        })} km
+                      </small>
                     </span>
-                    <strong>R$ 18,40</strong>
+                    <strong>
+                      {tripEstimate?.price.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </strong>
                   </div>
                   <button
                     className="primary full"
-                    onClick={() => recordInterest("Piloto de viagens")}
+                    onClick={() => recordInterest("Novidades sobre o lançamento")}
                   >
-                    Tenho interesse no piloto <Icon name="arrow" />
+                    Quero acompanhar o lançamento <Icon name="arrow" />
                   </button>
                   <p className="concept-note">
-                    Simulação ilustrativa. Valores e disponibilidade serão definidos no lançamento.
+                    Premissa ilustrativa: R$ 2,00/km (referência de R$ 20 a cada 10 km) + R$ 1,00 de
+                    taxa de serviço. O preço por km ainda precisa ser validado.
+                  </p>
+                  <p className="route-attribution">
+                    © OpenStreetMap contributors • rota por OSRM • busca por Photon.
                   </p>
                 </div>
               )
