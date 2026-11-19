@@ -278,7 +278,7 @@ function normalizePlaceName(value = "") {
 
 async function geocodePlace(query: string, bias?: PlaceCoordinates): Promise<GeocodedPlace> {
   const url = new URL("https://photon.komoot.io/api/");
-  url.searchParams.set("q", query.trim() + ", Natal, Rio Grande do Norte, Brasil");
+  url.searchParams.set("q", query.trim());
   url.searchParams.set("limit", "5");
   url.searchParams.set("lang", "default");
   url.searchParams.set("countrycode", "br");
