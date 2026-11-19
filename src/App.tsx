@@ -853,9 +853,9 @@ export default function App() {
           <div className="comparison" role="table" aria-label="Comparativo entre plataformas">
             <div className="comparison-row comparison-head" role="row">
               <span />
-              <strong>Uber</strong>
-              <strong>99</strong>
-              <strong>inDrive</strong>
+              <strong>Plataforma 1</strong>
+              <strong>Plataforma 2</strong>
+              <strong>Plataforma 3</strong>
               <strong>Leva Nós</strong>
             </div>
             {[
@@ -868,12 +868,12 @@ export default function App() {
               ],
               [
                 "Benefícios",
-                "Uber Pro e parceiros",
-                "Rota99 e campanhas",
+                "Programa de vantagens e parceiros",
+                "Benefícios para motoristas e campanhas",
                 "Proteção e segurança",
                 "Marketplace e planos",
               ],
-              ["Mulheres", "Uber Mulher", "99Mulher", "Não identificado*", "Modalidade proposta"],
+              ["Mulheres", "Modalidade para mulheres", "Modalidade para mulheres", "Não identificado*", "Modalidade proposta"],
               [
                 "Comissão",
                 "Varia por viagem",
