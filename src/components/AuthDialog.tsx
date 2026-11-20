@@ -5,6 +5,54 @@ import { isAuthConfigured, supabase } from "../lib/supabase";
 export type AuthMode = "login" | "signup" | "forgot" | "update-password" | "account";
 export type AccountRole = "Passageiro" | "Motorista" | "Parceiro local" | "Universidade";
 
+const profileOptions: Record<AccountRole, { label: string; description: string; welcome: string }> = {
+  Passageiro: { label: "Passageiro", description: "Quero acompanhar o lançamento para utilizar as viagens.", welcome: "Você pode acompanhar o lançamento e registrar seus interesses. As viagens ainda não estão disponíveis." },
+  Motorista: { label: "Motorista", description: "Quero dirigir e conhecer as condições para motoristas.", welcome: "Conheça as condições dos motoristas fundadores e os planos propostos. Este cadastro não aprova você para realizar corridas." },
+  "Parceiro local": { label: "Representante de negócio local", description: "Represento um negócio e tenho interesse em oferecer serviços ou benefícios.", welcome: "Seu perfil registra interesse em oferecer serviços ou benefícios à comunidade. Uma parceria dependerá de avaliação e acordo posterior." },
+  Universidade: { label: "Representante de universidade", description: "Represento uma instituição e tenho interesse em conhecer o piloto e possíveis parcerias.", welcome: "Seu perfil registra interesse institucional no piloto. Convênios e participação da universidade dependem de acordo posterior." },
+};
+
+function validRole(value: unknown): AccountRole {
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(profileOptions, value)
+    ? value as AccountRole : "Passageiro";
+}
+
+function representsOrganization(role: AccountRole) {
+  return role === "Parceiro local" || role === "Universidade";
+}
+
+function ProfileFields({ role, organization, onRoleChange, onOrganizationChange, disabled = false }: {
+  role: AccountRole;
+  organization: string;
+  onRoleChange: (role: AccountRole) => void;
+  onOrganizationChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <>
+      <label className="auth-field">
+        <span>Como você quer participar?</span>
+        <select value={role} disabled={disabled} aria-describedby="profile-description" onChange={(event) => {
+          onRoleChange(validRole(event.target.value));
+          onOrganizationChange("");
+        }}>
+          {(Object.keys(profileOptions) as AccountRole[]).map((value) => (
+            <option key={value} value={value}>{profileOptions[value].label}</option>
+          ))}
+        </select>
+      </label>
+      <p className="auth-muted" id="profile-description" aria-live="polite" style={{ margin: 0 }}>{profileOptions[role].description}</p>
+      {role === "Universidade" && <p className="auth-muted" style={{ margin: 0 }}>Se você é estudante e quer utilizar viagens, escolha Passageiro.</p>}
+      {representsOrganization(role) && (
+        <label className="auth-field">
+          <span>{role === "Universidade" ? "Nome da instituição" : "Nome do negócio"}</span>
+          <input value={organization} onChange={(event) => onOrganizationChange(event.target.value)} autoComplete="organization" maxLength={120} required disabled={disabled} />
+        </label>
+      )}
+    </>
+  );
+}
+
 type AuthDialogProps = {
   open: boolean;
   initialMode: AuthMode;
@@ -82,6 +130,9 @@ export default function AuthDialog({
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [role, setRole] = useState<AccountRole>(initialRole);
   const [fullName, setFullName] = useState("");
+  const [organization, setOrganization] = useState("");
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [savedProfile, setSavedProfile] = useState<{ role: AccountRole; organization: string } | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -96,7 +147,10 @@ export default function AuthDialog({
       setPassword("");
       setPasswordConfirm("");
     }
-  }, [open]);
+      setEditingProfile(false);
+      setSavedProfile(null);
+      setOrganization("");
+  }, [open, user?.id]);
 
   useEffect(() => {
     if (open) {
@@ -135,6 +189,10 @@ export default function AuthDialog({
       return;
     }
 
+    if (mode === "signup" && representsOrganization(role) && !organization.trim()) {
+      setError(role === "Universidade" ? "Informe o nome da instituição." : "Informe o nome do negócio.");
+      return;
+    }
     if (mode === "signup" && password !== passwordConfirm) {
       setError("As senhas não coincidem.");
       return;
@@ -152,7 +210,7 @@ export default function AuthDialog({
           email: email.trim(),
           password,
           options: {
-            data: { full_name: fullName.trim(), role, interests },
+            data: { full_name: fullName.trim(), role, interests, organization_name: representsOrganization(role) ? organization.trim() : null },
             emailRedirectTo: window.location.origin,
           },
         });
@@ -201,6 +259,35 @@ export default function AuthDialog({
     }
   }
 
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    if (!supabase || !user) {
+      setError("Entre na sua conta para corrigir o perfil.");
+      return;
+    }
+    if (representsOrganization(role) && !organization.trim()) {
+      setError(role === "Universidade" ? "Informe o nome da instituição." : "Informe o nome do negócio.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data, error: profileError } = await supabase.auth.updateUser({
+        data: { role, organization_name: representsOrganization(role) ? organization.trim() : null },
+      });
+      if (profileError) throw profileError;
+      if (!data.user) throw new Error("Perfil não retornado");
+      setSavedProfile({ role: validRole(data.user.user_metadata.role), organization: data.user.user_metadata.organization_name || "" });
+      setEditingProfile(false);
+      setNotice("Perfil atualizado com sucesso.");
+    } catch {
+      setError("Não foi possível salvar seu perfil. Tente novamente.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function signOut() {
     if (!supabase) return;
     setBusy(true);
@@ -217,7 +304,8 @@ export default function AuthDialog({
     ? (user.user_metadata.interests as string[])
     : [];
   const accountName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Sua conta";
-  const accountRole = (user?.user_metadata?.role as string | undefined) || "Passageiro";
+  const accountRole = savedProfile?.role ?? validRole(user?.user_metadata?.role);
+  const accountOrganization = savedProfile?.organization ?? (typeof user?.user_metadata?.organization_name === "string" ? user.user_metadata.organization_name : "");
 
   return (
     <div
@@ -242,9 +330,24 @@ export default function AuthDialog({
             <span className="auth-kicker">LEVA NÓS</span>
             <h2 id="auth-title">Olá, {accountName}.</h2>
             <p className="auth-intro">
-              Sua conta está ativa como {accountRole.toLocaleLowerCase("pt-BR")}.
+              Seu perfil: {profileOptions[accountRole].label}.
             </p>
             <p className="auth-email">{user.email}</p>
+            <p className="auth-muted">{profileOptions[accountRole].welcome}</p>
+            {representsOrganization(accountRole) && accountOrganization && (
+              <p className="auth-muted"><strong>{accountRole === "Universidade" ? "Instituição" : "Negócio"}:</strong> {accountOrganization}</p>
+            )}
+            {editingProfile ? (
+              <form className="auth-form" onSubmit={saveProfile}>
+                <ProfileFields role={role} organization={organization} onRoleChange={setRole} onOrganizationChange={setOrganization} disabled={busy} />
+                <button className="primary full" type="submit" disabled={busy}>{busy ? "Salvando perfil…" : "Salvar perfil"}</button>
+                <button className="auth-text-button full" type="button" disabled={busy} onClick={() => { setEditingProfile(false); setError(""); }}>Cancelar</button>
+              </form>
+            ) : (
+              <button className="auth-secondary full" type="button" disabled={busy} onClick={() => {
+                setRole(accountRole); setOrganization(accountOrganization); setEditingProfile(true); setError(""); setNotice("");
+              }}>Corrigir meu perfil</button>
+            )}
             {notice && (
               <p className="auth-message success" role="status">
                 {notice}
@@ -315,18 +418,7 @@ export default function AuthDialog({
                   required
                 />
               </label>
-              <label className="auth-field">
-                <span>Quero participar como</span>
-                <select
-                  value={role}
-                  onChange={(event) => setRole(event.target.value as AccountRole)}
-                >
-                  <option>Passageiro</option>
-                  <option>Motorista</option>
-                  <option>Parceiro local</option>
-                  <option>Universidade</option>
-                </select>
-              </label>
+              <ProfileFields role={role} organization={organization} onRoleChange={setRole} onOrganizationChange={setOrganization} disabled={busy} />
               <PasswordInput
                 label="Senha (mínimo 8 caracteres)"
                 value={password}
@@ -356,6 +448,7 @@ export default function AuthDialog({
                   Defina a URL e a chave pública do Supabase no ambiente do site para ativar contas.
                 </p>
               )}
+              <p className="auth-muted" style={{ margin: 0 }}>Cadastro gratuito para registrar seu interesse. Não contrata assinatura nem confirma participação no piloto.</p>
               <button className="primary full" type="submit" disabled={busy || !isAuthConfigured}>
                 {busy ? "Criando conta…" : "Criar conta"}
               </button>
