@@ -257,9 +257,13 @@ type TripEstimate = {
   destination: string;
   distanceKm: number;
   durationMinutes: number;
+  fare: number;
+  serviceFee: number;
+  price: number;
 };
 
 const SERVICE_FEE = 1;
+const DEMO_PRICE_PER_KM = 2;
 
 const NATAL_CENTER: PlaceCoordinates = { lat: -5.78, lon: -35.20 };
 const NATAL_BOUNDS = { west: -35.32, south: -5.95, east: -35.12, north: -5.66 };
@@ -352,12 +356,17 @@ async function estimateTrip(origin: string, destination: string): Promise<TripEs
   }
 
   const distanceKm = route.distance / 1000;
+  const fare = Math.round(distanceKm * DEMO_PRICE_PER_KM * 100) / 100;
+  const price = Math.round((fare + SERVICE_FEE) * 100) / 100;
 
   return {
     origin: originPlace.label,
     destination: destinationPlace.label,
     distanceKm,
     durationMinutes: Math.max(1, Math.ceil(route.duration / 60)),
+    fare,
+    serviceFee: SERVICE_FEE,
+    price,
   };
 }
 
@@ -618,7 +627,7 @@ export default function App() {
                     <i />
                   </label>
                   <button className="primary full" type="submit" disabled={tripLoading}>
-                    {tripLoading ? "Calculando trajeto..." : "Calcular trajeto"}
+                    {tripLoading ? "Calculando estimativa..." : "Calcular estimativa"}
                     {!tripLoading && <Icon name="arrow" />}
                   </button>
                   {tripError && (
@@ -649,8 +658,8 @@ export default function App() {
                       </strong>
                     </span>
                   </div>
-                  <h2>Estimativa de trajeto</h2>
-                  <p className="concept-note">Demonstração em Natal, RN. Esta simulação não solicita uma corrida.</p>
+                  <h2>Estimativa de viagem</h2>
+                  <p className="concept-note"><strong>Valor ilustrativo para demonstração.</strong><br />Simulação em Natal, RN. Não solicita uma corrida.</p>
                   <div className="ride-option">
                     <span className="car-badge">
                       <Icon name="car" size={26} />
@@ -664,17 +673,22 @@ export default function App() {
                         })} km
                       </small>
                     </span>
-                    <strong style={{ fontSize: 13 }}>Valor a definir</strong>
+                    <strong>
+                      {tripEstimate?.price.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </strong>
                   </div>
-                  <dl style={{ margin: "16px 0", fontSize: 13, lineHeight: 1.6 }} aria-label="Condições de preço propostas">
+                  <dl style={{ margin: "16px 0", fontSize: 13, lineHeight: 1.6 }} aria-label="Composição do preço estimado">
                     {[
-                      ["Tarifa por km", "Em definição"],
-                      ["Taxa de serviço proposta", SERVICE_FEE.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) + " por corrida"],
-                      ["Total da viagem", "A definir"],
+                      ["Tarifa estimada da viagem", tripEstimate?.fare],
+                      ["Taxa de serviço do passageiro", tripEstimate?.serviceFee],
+                      ["Total estimado", tripEstimate?.price],
                     ].map(([label, value]) => (
                       <div key={String(label)} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "6px 0", borderBottom: "1px solid #d6e7f5" }}>
                         <dt>{label}</dt>
-                        <dd style={{ margin: 0, fontWeight: 700, textAlign: "right" }}>{value}</dd>
+                        <dd style={{ margin: 0, fontWeight: 700, whiteSpace: "nowrap" }}>{Number(value ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</dd>
                       </div>
                     ))}
                   </dl>
@@ -685,9 +699,9 @@ export default function App() {
                     Quero acompanhar o lançamento <Icon name="arrow" />
                   </button>
                   <p className="concept-note">
-                    O plano de negócios ainda não define a tarifa por quilômetro; por isso, esta simulação mostra apenas distância e tempo estimados.
-                    A taxa proposta de R$ 1,00 é paga pelo passageiro, inclusive durante a isenção de comissão dos motoristas.
-                    O ticket médio de R$ 20,00 é uma referência de planejamento, não o preço desta rota.
+                    Cálculo demonstrativo: R$ 2,00 por km + R$ 1,00 de taxa de serviço por corrida.
+                    Os R$ 2,00/km são uma hipótese desta demonstração, não uma tarifa definida no plano de negócios.
+                    A taxa de R$ 1,00 segue a proposta do plano. O preço oficial ainda será validado.
                   </p>
                   <p className="route-attribution">
                     © OpenStreetMap contributors • rota por OSRM • busca por Photon.
