@@ -258,6 +258,8 @@ type TripEstimate = {
   distanceKm: number;
   durationMinutes: number;
   price: number;
+  fare: number;
+  serviceFee: number;
 };
 
 const REFERENCE_TICKET = 20;
@@ -356,7 +358,8 @@ async function estimateTrip(origin: string, destination: string): Promise<TripEs
   }
 
   const distanceKm = route.distance / 1000;
-  const price = Math.round((distanceKm * ESTIMATED_PRICE_PER_KM + SERVICE_FEE) * 100) / 100;
+  const fare = Math.round(distanceKm * ESTIMATED_PRICE_PER_KM * 100) / 100;
+  const price = Math.round((fare + SERVICE_FEE) * 100) / 100;
 
   return {
     origin: originPlace.label,
@@ -364,6 +367,8 @@ async function estimateTrip(origin: string, destination: string): Promise<TripEs
     distanceKm,
     durationMinutes: Math.max(1, Math.ceil(route.duration / 60)),
     price,
+    fare,
+    serviceFee: SERVICE_FEE,
   };
 }
 
@@ -544,6 +549,7 @@ export default function App() {
               <em>Novas possibilidades.</em>
             </h1>
             <p>Viagens, oportunidades de renda e benefícios para quem movimenta a cidade.</p>
+            <p style={{ fontSize: 13, lineHeight: 1.6 }}>Projeto acadêmico em demonstração. Corridas ainda não disponíveis.</p>
             <div className="hero-proof">
               <span>
                 <Icon name="shield" /> Segurança em cada etapa
@@ -655,12 +661,13 @@ export default function App() {
                     </span>
                   </div>
                   <h2>Estimativa de viagem</h2>
+                  <p className="concept-note">Demonstração em Natal, RN. Esta simulação não solicita uma corrida.</p>
                   <div className="ride-option">
                     <span className="car-badge">
                       <Icon name="car" size={26} />
                     </span>
                     <span>
-                      <strong>{women ? "Leva Nós Mulheres" : "Leva Nós Essencial"}</strong>
+                      <strong>{women ? "Leva Nós Mulheres" : "Leva Nós"}</strong>
                       <small>
                         Rota de carro • {tripEstimate?.distanceKm.toLocaleString("pt-BR", {
                           maximumFractionDigits: 1,
@@ -675,6 +682,18 @@ export default function App() {
                       })}
                     </strong>
                   </div>
+                  <dl style={{ margin: "16px 0", fontSize: 13, lineHeight: 1.6 }} aria-label="Composição do preço estimado">
+                    {[
+                      ["Tarifa estimada da viagem", tripEstimate?.fare],
+                      ["Taxa de serviço do passageiro", tripEstimate?.serviceFee],
+                      ["Total estimado", tripEstimate?.price],
+                    ].map(([label, value]) => (
+                      <div key={String(label)} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "6px 0", borderBottom: "1px solid #d6e7f5" }}>
+                        <dt>{label}</dt>
+                        <dd style={{ margin: 0, fontWeight: 700, whiteSpace: "nowrap" }}>{Number(value ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</dd>
+                      </div>
+                    ))}
+                  </dl>
                   <button
                     className="primary full"
                     onClick={() => recordInterest("Novidades sobre o lançamento")}
@@ -682,8 +701,8 @@ export default function App() {
                     Quero acompanhar o lançamento <Icon name="arrow" />
                   </button>
                   <p className="concept-note">
-                    Premissa ilustrativa: R$ 2,00/km (referência de R$ 20 a cada 10 km) + R$ 1,00 de
-                    taxa de serviço. O preço por km ainda precisa ser validado.
+                    R$ 2,00/km é uma premissa ilustrativa do simulador, ainda não definida no plano de negócios.
+                    A taxa de R$ 1,00 por corrida segue a proposta do plano. Valores sujeitos à validação.
                   </p>
                   <p className="route-attribution">
                     © OpenStreetMap contributors • rota por OSRM • busca por Photon.
@@ -736,6 +755,27 @@ export default function App() {
           </div>
         </section>
 
+        <section className="section" id="piloto">
+          <div className="section-heading">
+            <span className="kicker">PILOTO PROPOSTO EM NATAL, RN</span>
+            <h2>Começar perto para atender melhor.</h2>
+            <p>O plano prevê concentrar a operação em um campus e bairros próximos antes de expandir.</p>
+          </div>
+          <div className="audience-grid">
+            {[
+              ["pin", "Território inicial", "Um campus e corredores próximos em Natal. Universidade e área de atendimento ainda serão definidas; não há convênio confirmado."],
+              ["clock", "Horários prioritários", "A pesquisa vai mapear a demanda por horário, com foco nos picos e na proposta de volta segura noturna por convênio institucional."],
+              ["users", "Comunidade inicial", "Passageiros universitários e urbanos, motoristas elegíveis e negócios locais. O piloto prevê 150 motoristas fundadores."],
+            ].map(([icon, title, description]) => (
+              <article className="audience-card" key={title}>
+                <span className="icon-box"><Icon name={icon as IconName} size={25} /></span>
+                <h3>{title}</h3><p>{description}</p>
+              </article>
+            ))}
+          </div>
+          <p className="disclaimer">A busca de endereços permite simulações em Natal; isso não representa cobertura operacional já disponível.</p>
+        </section>
+
         <section className="trust-strip" aria-label="Dados de mercado">
           <p>
             O ponto de partida combina <strong>comunidade universitária</strong> e mobilidade
@@ -766,7 +806,7 @@ export default function App() {
                 "pin",
                 "Para quem vai",
                 "Viagens para estudar, trabalhar e aproveitar a cidade.",
-                "Pedir uma viagem",
+                "Simular uma viagem",
               ],
               [
                 "car",
@@ -983,35 +1023,37 @@ export default function App() {
         <section className="plans-section" id="planos">
           <div className="section-heading">
             <span className="kicker">PLANOS</span>
-            <h2>Um plano para cada momento.</h2>
-            <p>Acesso básico gratuito e duas opções de assinatura para ampliar os benefícios.</p>
+            <h2>Planos para a rotina do motorista.</h2>
+            <p>Acesso básico gratuito e assinaturas opcionais previstas a partir do 4º mês do piloto.</p>
           </div>
           <div className="plans">
             {[
               [
                 "Essencial",
-                "Acesso gratuito",
-                "Para começar sem mensalidade e acompanhar as funções essenciais da plataforma.",
-                ["Aplicativo e extrato", "Ofertas básicas dos parceiros disponíveis"],
+                "Grátis • sem mensalidade",
+                "Para acompanhar as funções básicas da plataforma sem contratar uma assinatura.",
+                ["Aplicativo e extrato", "Ofertas básicas dos parceiros disponíveis", "Segurança essencial e Leva Nós Mulheres previstas em todos os planos"],
               ],
               [
                 "Mais",
-                "Assinatura opcional",
-                "Para quem quer ampliar as vantagens disponíveis na rotina.",
+                "R$ 29,90/mês • valor proposto",
+                "Para ampliar os benefícios na rotina. O plano prevê economia comprovada de pelo menos duas vezes a mensalidade.",
                 [
                   "Tudo do Essencial",
-                  "Benefícios adicionais conforme a rede disponível",
-                  "Campanhas para usuários elegíveis",
+                  "Benefícios adicionais e campanhas, conforme a rede contratada",
+                  "Meta prevista de economia: pelo menos R$ 59,80/mês",
+                  "Economia acompanhada no extrato mensal",
                 ],
               ],
               [
                 "Completo",
-                "Assinatura opcional",
-                "Para quem busca a rede mais ampla de parceiros e benefícios.",
+                "R$ 59,90/mês • valor proposto",
+                "Para acessar a rede ampliada de benefícios. As condições de cada parceiro serão definidas antes da oferta.",
                 [
                   "Tudo do Mais",
-                  "Rede ampliada de parceiros e benefícios",
-                  "Condições em parceiros selecionados",
+                  "Condições em uma rede ampliada de parceiros, a contratar",
+                  "Meta prevista de economia: pelo menos R$ 119,80/mês",
+                  "Economia acompanhada no extrato mensal",
                 ],
               ],
             ].map(([name, subtitle, description, items], index) => (
@@ -1019,7 +1061,7 @@ export default function App() {
                 className={`plan-card ${index === 1 ? "featured" : ""}`}
                 key={name as string}
               >
-                {index === 1 && <span className="popular">MAIS ESCOLHIDO</span>}
+                {index === 1 && <span className="popular">PLANO MAIS</span>}
                 <div className="plan-head">
                   <span className="plan-icon">
                     <Icon name={index === 0 ? "route" : index === 1 ? "star" : "spark"} />
@@ -1038,7 +1080,7 @@ export default function App() {
                 </ul>
                 <button
                   className={index === 1 ? "primary full" : "secondary full"}
-                  onClick={() => recordInterest(`Plano: ${name as string}`)}
+                  onClick={() => recordInterest(`Plano: ${name as string}`, "Motorista")}
                 >
                   Tenho interesse
                 </button>
@@ -1046,9 +1088,33 @@ export default function App() {
             ))}
           </div>
           <p className="plans-note">
-            Planos propostos. Preços, benefícios e regulamentos serão definidos para lançamento.
-            Segurança essencial incluída em todos os níveis.
+            Valores de planejamento, sem cobrança de assinatura neste site. Benefícios e parceiros ainda dependem de contratação.
+            A mensalidade é separada da comissão do motorista e da taxa de R$ 1,00 paga pelo passageiro por corrida.
+            A assinatura não prevê isenção dessas cobranças.
           </p>
+
+          <div className="section" style={{ paddingTop: 24, paddingBottom: 16, maxWidth: 720 }}>
+            <article className="audience-card">
+              <span className="kicker">EXTRATO DEMONSTRATIVO</span>
+              <h3>Como acompanhar a economia da assinatura</h3>
+              <p>Exemplo fictício para explicar a proposta do plano Mais. Os valores abaixo não são descontos disponíveis nem ofertas de parceiros confirmados.</p>
+              <dl style={{ margin: "16px 0", fontSize: 14 }}>
+                {[
+                  ["Economia hipotética com combustível", "R$ 30,00"],
+                  ["Economia hipotética com manutenção", "R$ 25,00"],
+                  ["Economia hipotética com telefonia", "R$ 10,00"],
+                  ["Economia total no exemplo", "R$ 65,00"],
+                  ["Mensalidade proposta do Mais", "− R$ 29,90"],
+                  ["Economia após a mensalidade", "R$ 35,10"],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "10px 0", borderBottom: "1px solid #d6e7f5" }}>
+                    <dt>{label}</dt><dd style={{ margin: 0, fontWeight: 700, whiteSpace: "nowrap" }}>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p>Neste exemplo, R$ 65,00 supera a meta prevista de R$ 59,80 em benefícios, equivalente a duas mensalidades. A economia real dependerá do uso e da rede contratada.</p>
+            </article>
+          </div>
         </section>
 
         <section className="section difference">
@@ -1137,8 +1203,8 @@ export default function App() {
             </div>
             <p className="disclaimer dark">
               Modelo previsto: comissão sobre corridas, assinaturas e remuneração por transações
-              elegíveis com parceiros. Cidade e parceiros do piloto serão definidos na preparação do
-              lançamento.
+              elegíveis com parceiros. A proposta local é iniciar em Natal, RN; campus, parceiros e território
+              do piloto ainda serão definidos e validados antes do lançamento.
             </p>
           </div>
         </section>
