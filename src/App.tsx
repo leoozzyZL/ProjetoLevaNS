@@ -692,24 +692,44 @@ export default function App() {
               )
             ) : (
               <div className="driver-panel">
-                <span className="commission-pill">Condição inicial proposta</span>
+                <span className="commission-pill">Condições propostas para motoristas</span>
                 <h2>Comece com mais incentivo.</h2>
-                <p>Cadastre seu interesse e acompanhe as próximas etapas do piloto.</p>
-                <div className="commission">
-                  <strong>
-                    90 <small>dias</small>
-                  </strong>
-                  <span>sem comissão sobre corridas*</span>
-                </div>
-                <div className="mini-stat">
-                  <strong>3%</strong>
-                  <span>comissão inicial após a isenção*</span>
-                </div>
+                <p>Veja como funciona a comissão sobre suas corridas.</p>
+                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: 12, lineHeight: 1.5, margin: "20px 0" }}>
+                  <caption style={{ textAlign: "left", fontWeight: 700, marginBottom: 10 }}>Exemplo com tarifa de R$ 20,00</caption>
+                  <thead>
+                    <tr style={{ background: "#eaf6ff", color: "#0758aa" }}>
+                      {["Condição", "Sem comissão", "Com comissão"].map((label) => (
+                        <th key={label} scope="col" style={{ padding: "10px 8px", textAlign: "left" }}>{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["Quando se aplica", "Primeiros 90 dias dos 150 motoristas fundadores", "Após a isenção; padrão para os demais motoristas"],
+                      ["Comissão", "0%", "3%"],
+                      ["Plataforma recebe", "R$ 0,00", "R$ 0,60"],
+                      ["Motorista recebe¹", "R$ 20,00", "R$ 19,40"],
+                    ].map(([label, exempt, standard]) => (
+                      <tr key={label} style={{ borderBottom: "1px solid #d6e7f5" }}>
+                        <th scope="row" style={{ padding: "10px 8px", textAlign: "left", verticalAlign: "top" }}>{label}</th>
+                        <td style={{ padding: "10px 8px", verticalAlign: "top" }}>{exempt}</td>
+                        <td style={{ padding: "10px 8px", verticalAlign: "top" }}>{standard}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 16 }}>
+                  <b>Condição dos fundadores:</b> após os 90 dias, comissão de 3% garantida por 12 meses, mantendo avaliação igual ou superior a 4,8.
+                </p>
                 <button className="primary full" onClick={() => openAuth("signup", "Motorista")}>
                   Quero dirigir <Icon name="arrow" />
                 </button>
-                <small className="availability">
-                  *Política proposta. Faixa de 3% a 10%, conforme regulamento.
+                <small className="availability" style={{ textAlign: "left" }}>
+                  ¹Valores antes dos custos do motorista, como combustível e manutenção.
+                  A taxa de serviço de R$ 1 é paga pelo passageiro, inclusive durante a isenção.
+                  Categorias especiais ou campanhas publicadas podem ter comissão de até 10%.
+                  Condições propostas no plano de negócios, sujeitas ao regulamento de lançamento.
                 </small>
               </div>
             )}
