@@ -644,17 +644,22 @@ export default function App() {
                   <button className="back-button" onClick={() => setTrip(false)}>
                     ← Alterar destino
                   </button>
-                  <div className="result-route">
-                    <Icon name="route" size={32} />
-                    <span>
+                  <div className="result-route" style={{ alignItems: "flex-start" }}>
+                    <span style={{ flexShrink: 0 }}><Icon name="route" size={32} /></span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
                       <small>
                         {tripEstimate?.distanceKm.toLocaleString("pt-BR", {
                           maximumFractionDigits: 1,
                           minimumFractionDigits: 1,
                         })} km • {tripEstimate?.durationMinutes} min estimados
                       </small>
-                      <strong>
-                        {tripEstimate?.origin} → {tripEstimate?.destination}
+                      <small style={{ marginTop: 10 }}>Partida</small>
+                      <strong style={{ whiteSpace: "normal", overflow: "visible", textOverflow: "clip", maxWidth: "none", overflowWrap: "anywhere", lineHeight: 1.5 }}>
+                        {tripEstimate?.origin}
+                      </strong>
+                      <small style={{ marginTop: 10 }}>Chegada</small>
+                      <strong style={{ whiteSpace: "normal", overflow: "visible", textOverflow: "clip", maxWidth: "none", overflowWrap: "anywhere", lineHeight: 1.5 }}>
+                        {tripEstimate?.destination}
                       </strong>
                     </span>
                   </div>
