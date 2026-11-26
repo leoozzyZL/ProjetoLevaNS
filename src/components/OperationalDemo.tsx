@@ -56,8 +56,9 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
   }
   function saveOffer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (Object.values(draft).some(value => !value.trim()) || draft.expires < today) { setMessage("Preencha os campos e escolha uma validade a partir de hoje."); return; }
-    const offer = { ...draft, title: draft.title.trim(), business: draft.business.trim(), benefit: draft.benefit.trim(), conditions: draft.conditions.trim(), id: editing || crypto.randomUUID(), active: offers.find(item => item.id === editing)?.active ?? true };
+    const expires = String(new FormData(event.currentTarget).get("expires") || "");
+    if (Object.values({ ...draft, expires }).some(value => !value.trim()) || expires < today) { setMessage("Preencha os campos e escolha uma validade a partir de hoje."); return; }
+    const offer = { ...draft, expires, title: draft.title.trim(), business: draft.business.trim(), benefit: draft.benefit.trim(), conditions: draft.conditions.trim(), id: editing || crypto.randomUUID(), active: offers.find(item => item.id === editing)?.active ?? true };
     offersStore.save(editing ? offers.map(item => item.id === editing ? offer : item) : [offer, ...offers]);
     setEditing(null); setDraft(emptyOffer); setMessage("Oferta salva no seu painel de demonstração.");
   }
@@ -107,7 +108,7 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
         <label>Categoria<select value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value })}>{["Veículos", "Saúde", "Alimentação", "Educação", "Serviços"].map(value => <option key={value}>{value}</option>)}</select></label>
         <label>Benefício oferecido<input required maxLength={200} placeholder="Ex.: 10% de desconto na revisão" value={draft.benefit} onChange={e => setDraft({ ...draft, benefit: e.target.value })}/></label>
         <label>Condições de uso<input required maxLength={300} placeholder="Ex.: apresentar cadastro; não cumulativo" value={draft.conditions} onChange={e => setDraft({ ...draft, conditions: e.target.value })}/></label>
-        <label>Válida até<input type="date" required min={today} value={draft.expires} onChange={e => setDraft({ ...draft, expires: e.target.value })}/></label>
+        <label>Válida até<input name="expires" type="date" required min={today} value={draft.expires} onChange={e => setDraft({ ...draft, expires: e.target.value })}/></label>
         <button className="primary full" type="submit">{editing ? "Salvar alterações" : "Salvar oferta"}</button>
         {editing && <button className="auth-secondary full" type="button" onClick={() => { setEditing(null); setDraft(emptyOffer); }}>Cancelar edição</button>}
       </form>
