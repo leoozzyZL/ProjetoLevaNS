@@ -76,7 +76,7 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
     {(ridesStore.warning || offersStore.warning) && <p role="alert">{ridesStore.warning || offersStore.warning}</p>}
     {tab === "driver" ? <>
       <h3>Pedidos e corridas</h3>
-      <label className="auth-form" style={{ marginTop: 12 }}>Condição da próxima simulação
+      <label className="auth-field" style={{ marginTop: 12 }}><span>Condição da próxima simulação</span>
         <select value={rate} onChange={event => setRate(Number(event.target.value))}>
           <option value={0}>Fundador: isenção de comissão nos primeiros 90 dias</option>
           <option value={0.03}>Após a isenção: comissão inicial proposta de 3%</option>
@@ -85,7 +85,7 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
       <p className="auth-muted">Exemplos fixos em Natal: R$ 2/km, premissa ilustrativa. Taxa de R$ 1 do passageiro separada dos ganhos. Não inclui combustível, custos ou assinatura.</p>
       <button className="primary full" type="button" disabled={rides.some(ride => ride.status === "Novo pedido")} onClick={receiveRide}>Simular recebimento de pedido</button>
       <div style={card}><strong>Resumo das corridas concluídas</strong><p>{completed.length} corrida(s) • Ganhos após comissão: <strong>{money(completed.reduce((sum, ride) => sum + round(ride.fare - round(ride.fare * ride.rate)), 0))}</strong></p><small>Valor da viagem menos a comissão; custos do motorista não descontados.</small></div>
-      <label className="auth-form" style={{ marginTop: 12 }}>Filtrar corridas<select value={filter} onChange={event => setFilter(event.target.value)}>{["Todas", "Novo pedido", "Aceita", "Em andamento", "Concluída", "Recusada", "Cancelada"].map(value => <option key={value}>{value}</option>)}</select></label>
+      <label className="auth-field" style={{ marginTop: 12 }}><span>Filtrar corridas</span><select value={filter} onChange={event => setFilter(event.target.value)}>{["Todas", "Novo pedido", "Aceita", "Em andamento", "Concluída", "Recusada", "Cancelada"].map(value => <option key={value}>{value}</option>)}</select></label>
       {!rides.length && <p className="auth-muted">Ainda não há corridas. Simule um pedido para começar.</p>}
       {rides.length > 0 && !rides.some(ride => filter === "Todas" || ride.status === filter) && <p className="auth-muted">Nenhuma corrida neste filtro.</p>}
       {rides.filter(ride => filter === "Todas" || ride.status === filter).map(ride => <article style={card} key={ride.id} aria-label={`Corrida ${ride.status}`}>
@@ -103,12 +103,12 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
     </> : <>
       <h3>{editing ? "Editar oferta" : "Cadastrar oferta"}</h3>
       <form className="auth-form" onSubmit={saveOffer}>
-        <label>Nome do negócio<input required maxLength={100} value={draft.business} onChange={e => setDraft({ ...draft, business: e.target.value })}/></label>
-        <label>Título da oferta<input required maxLength={100} value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })}/></label>
-        <label>Categoria<select value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value })}>{["Veículos", "Saúde", "Alimentação", "Educação", "Serviços"].map(value => <option key={value}>{value}</option>)}</select></label>
-        <label>Benefício oferecido<input required maxLength={200} placeholder="Ex.: 10% de desconto na revisão" value={draft.benefit} onChange={e => setDraft({ ...draft, benefit: e.target.value })}/></label>
-        <label>Condições de uso<input required maxLength={300} placeholder="Ex.: apresentar cadastro; não cumulativo" value={draft.conditions} onChange={e => setDraft({ ...draft, conditions: e.target.value })}/></label>
-        <label>Válida até<input name="expires" type="date" required min={today} value={draft.expires} onChange={e => setDraft({ ...draft, expires: e.target.value })}/></label>
+        <label className="auth-field"><span>Nome do negócio</span><input required maxLength={100} value={draft.business} onChange={e => setDraft({ ...draft, business: e.target.value })}/></label>
+        <label className="auth-field"><span>Título da oferta</span><input required maxLength={100} value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })}/></label>
+        <label className="auth-field"><span>Categoria</span><select value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value })}>{["Veículos", "Saúde", "Alimentação", "Educação", "Serviços"].map(value => <option key={value}>{value}</option>)}</select></label>
+        <label className="auth-field"><span>Benefício oferecido</span><input required maxLength={200} placeholder="Ex.: 10% de desconto na revisão" value={draft.benefit} onChange={e => setDraft({ ...draft, benefit: e.target.value })}/></label>
+        <label className="auth-field"><span>Condições de uso</span><input required maxLength={300} placeholder="Ex.: apresentar cadastro; não cumulativo" value={draft.conditions} onChange={e => setDraft({ ...draft, conditions: e.target.value })}/></label>
+        <label className="auth-field"><span>Válida até</span><input name="expires" type="date" required min={today} value={draft.expires} onChange={e => setDraft({ ...draft, expires: e.target.value })}/></label>
         <button className="primary full" type="submit">{editing ? "Salvar alterações" : "Salvar oferta"}</button>
         {editing && <button className="auth-secondary full" type="button" onClick={() => { setEditing(null); setDraft(emptyOffer); }}>Cancelar edição</button>}
       </form>
