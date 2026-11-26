@@ -11,6 +11,8 @@ const examples = [
   { origin: "Praça Cívica, Petrópolis, Natal/RN", destination: "Praia do Meio, Natal/RN", km: 3.5, minutes: 10, fare: 7 },
   { origin: "Via Direta, Lagoa Nova, Natal/RN", destination: "Arena das Dunas, Lagoa Nova, Natal/RN", km: 2.6, minutes: 8, fare: 5.2 },
 ];
+type PassengerTrip = (typeof examples)[number] & { status: "Solicitada" | "Aceita" | "Em andamento" | "Concluída" };
+const passengerStages: PassengerTrip["status"][] = ["Solicitada", "Aceita", "Em andamento", "Concluída"];
 const emptyOffer = { title: "", business: "", category: "Veículos", benefit: "", conditions: "", expires: "" };
 
 function useDemoStore<T>(key: string, initial: T) {
@@ -27,7 +29,24 @@ function useDemoStore<T>(key: string, initial: T) {
 }
 
 export default function OperationalDemo({ scope, initialRole, onBack }: { scope: string; initialRole: string; onBack: () => void }) {
-  const [tab, setTab] = useState(initialRole === "Parceiro local" ? "partner" : "driver");
+  const [tab, setTab] = useState(initialRole === "Motorista" ? "driver" : initialRole === "Parceiro local" ? "partner" : "passenger");
+  const [selectedRoute, setSelectedRoute] = useState("0");
+  const passengerStore = useDemoStore<PassengerTrip | null>(`levanos-demo-v1:${scope}:passenger-trip`, null);
+  const passengerTrip = passengerStore.value;
+  const passengerActive = Boolean(passengerTrip && passengerTrip.status !== "Concluída");
+  const routePreview = passengerActive && passengerTrip ? passengerTrip : examples[Number(selectedRoute)] ?? examples[0];
+  function confirmPassengerTrip() {
+    if (passengerActive) return;
+    passengerStore.save({ ...routePreview, status: "Solicitada" });
+    setMessage("Viagem fictícia solicitada. Acompanhe o status em Minha viagem.");
+  }
+  function advancePassengerTrip() {
+    if (!passengerTrip || passengerTrip.status === "Concluída") return;
+    const nextStatus = passengerStages[passengerStages.indexOf(passengerTrip.status) + 1];
+    if (!nextStatus) return;
+    passengerStore.save({ ...passengerTrip, status: nextStatus });
+    setMessage(`Atualização simulada recebida: viagem ${nextStatus.toLowerCase()}.`);
+  }
   const ridesStore = useDemoStore<Ride[]>(`levanos-demo-v1:${scope}:rides`, []);
   const offersStore = useDemoStore<Offer[]>(`levanos-demo-v1:${scope}:offers`, []);
   const rides = Array.isArray(ridesStore.value) ? ridesStore.value : [];
@@ -77,13 +96,40 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
       <p>Escolha um perfil e explore cada etapa no seu ritmo.</p>
     </header>
     <div className="demo-profile-tabs" role="group" aria-label="Painel de demonstração">
+      <button type="button" aria-pressed={tab === "passenger"} onClick={() => { setTab("passenger"); setMessage(""); }}><strong>Passageiro</strong><span>Trajeto, preço e minha viagem</span></button>
       <button type="button" aria-pressed={tab === "driver"} onClick={() => { setTab("driver"); setMessage(""); }}><strong>Motorista</strong><span>Pedidos, corridas e ganhos</span></button>
       <button type="button" aria-pressed={tab === "partner"} onClick={() => { setTab("partner"); setMessage(""); }}><strong>Parceiro</strong><span>Cadastro e gestão de ofertas</span></button>
     </div>
-    <aside className="demo-notice"><strong>Ambiente de apresentação</strong><p>Pedidos e valores fictícios. Nenhuma corrida ou oferta é enviada a outras pessoas. Os dados ficam neste navegador, separados por conta.</p></aside>
+    <aside className="demo-notice"><strong>Demonstração acadêmica · Projeto A3</strong><p>Dados, pedidos e valores fictícios. Nenhuma corrida ou oferta é enviada a outras pessoas. Teste os três perfis sem criar conta. Os dados ficam neste navegador, separados por conta; cada perfil explora seu próprio cenário de demonstração.</p></aside>
     {message && <p className="auth-message success" role="status">{message}</p>}
-    {(ridesStore.warning || offersStore.warning) && <p role="alert">{ridesStore.warning || offersStore.warning}</p>}
-    {tab === "driver" ? <>
+    {(passengerStore.warning || ridesStore.warning || offersStore.warning) && <p role="alert">{passengerStore.warning || ridesStore.warning || offersStore.warning}</p>}
+    {tab === "passenger" ? <div className="demo-driver-grid demo-passenger-grid">
+      <section className="demo-section">
+        <span className="demo-step">01 · ESCOLHA SEU TRAJETO</span><h3>Uma viagem por Natal</h3>
+        <p>Escolha um exemplo e confira o preço completo antes de confirmar.</p>
+        <label className="auth-field"><span>Trajeto de exemplo em Natal</span><select value={selectedRoute} disabled={passengerActive} onChange={event => { setSelectedRoute(event.target.value); setMessage(""); }}>
+          {examples.map((route, index) => <option key={route.origin} value={index}>{route.origin.split(",")[0]} → {route.destination.split(",")[0]}</option>)}
+        </select></label>
+        <div className="demo-route demo-passenger-route"><div><span>PARTIDA</span><p>{routePreview.origin}</p></div><div><span>CHEGADA</span><p>{routePreview.destination}</p></div></div>
+        <p className="demo-trip-facts">{routePreview.km.toLocaleString("pt-BR")} km · {routePreview.minutes} min fictícios</p>
+        <dl className="demo-price"><div><dt>Valor da viagem</dt><dd>{money(routePreview.fare)}</dd></div><div><dt>Taxa de serviço</dt><dd>{money(1)}</dd></div><div className="demo-earning"><dt>Preço total</dt><dd>{money(round(routePreview.fare + 1))}</dd></div></dl>
+        <p className="demo-help">Valores ilustrativos: R$ 2/km + R$ 1 de taxa de serviço. A tarifa por km é uma hipótese de demonstração, não um preço definido no plano de negócios.</p>
+        <button className="primary full" type="button" disabled={passengerActive} onClick={confirmPassengerTrip}>Confirmar viagem fictícia</button>
+        {passengerActive && <p className="demo-help">Você já tem uma viagem solicitada. Simule as etapas em Minha viagem até concluí-la para testar outro trajeto.</p>}
+      </section>
+      <section className="demo-section" aria-label="Minha viagem">
+        <span className="demo-step">02 · ACOMPANHE AS ATUALIZAÇÕES</span><h3>Minha viagem</h3>
+        <p>Você consulta somente a sua viagem neste cenário de demonstração.</p>
+        {!passengerTrip ? <div className="demo-empty"><strong>Sua próxima viagem aparece aqui</strong><p>Escolha um trajeto e clique em Confirmar viagem fictícia para começar.</p></div> : <article className="demo-ride" aria-label={`Minha viagem ${passengerTrip.status}`}>
+          <div className="demo-card-heading"><strong className="demo-badge">{passengerTrip.status}</strong><span>Viagem fictícia</span></div>
+          <ol className="demo-timeline" aria-label="Etapas da minha viagem">{passengerStages.map((stage, index) => <li key={stage} className={index <= passengerStages.indexOf(passengerTrip.status) ? "reached" : ""} aria-current={stage === passengerTrip.status ? "step" : undefined}><span>{index + 1}</span>{stage}</li>)}</ol>
+          <div className="demo-route"><div><span>PARTIDA</span><p>{passengerTrip.origin}</p></div><div><span>CHEGADA</span><p>{passengerTrip.destination}</p></div></div>
+          <p className="demo-trip-facts">{passengerTrip.km.toLocaleString("pt-BR")} km · {passengerTrip.minutes} min fictícios</p>
+          <dl className="demo-price"><div><dt>Taxa de serviço incluída</dt><dd>{money(1)}</dd></div><div className="demo-earning"><dt>Total da sua viagem</dt><dd>{money(round(passengerTrip.fare + 1))}</dd></div></dl>
+          {passengerTrip.status !== "Concluída" ? <><p className="demo-help">O botão abaixo simula as atualizações que o passageiro receberia. Ele não aceita, inicia ou conclui uma corrida real.</p><button className="primary full" type="button" onClick={advancePassengerTrip}>Simular próxima etapa</button></> : <p className="demo-complete" role="status">Viagem fictícia concluída! Você pode escolher outro trajeto e confirmar uma nova demonstração.</p>}
+        </article>}
+      </section>
+    </div> : tab === "driver" ? <>
       <div className="demo-metrics" aria-label="Resumo do motorista">
         <div><span>Corridas concluídas</span><strong>{completed.length}</strong></div>
         <div><span>Ganhos após comissão</span><strong>{money(earnings)}</strong><small>Antes de combustível e outros custos</small></div>
@@ -99,7 +145,7 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
           </select></label>
           <p className="demo-help">Isenção proposta nos primeiros 90 dias dos fundadores. Depois, comissão inicial proposta de 3%.</p>
           <button className="primary full" type="button" disabled={rides.some(ride => ride.status === "Novo pedido")} onClick={receiveRide}>Simular recebimento de pedido</button>
-          {rides.some(ride => ride.status === "Novo pedido") && <p className="demo-help">Há um pedido aguardando sua decisão na área ao lado.</p>}
+          {rides.some(ride => ride.status === "Novo pedido") && <p className="demo-help">Há um pedido aguardando sua decisão na área de corridas.</p>}
           <details className="demo-details"><summary>Como os valores são calculados</summary><p>Exemplos fixos em Natal: R$ 2/km, premissa ilustrativa. Taxa de R$ 1 do passageiro separada dos ganhos. Não inclui combustível, custos ou assinatura. Os R$ 2/km não são uma tarifa definida no plano de negócios.</p></details>
         </section>
         <section className="demo-section">
@@ -140,7 +186,7 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
             <label className="auth-field"><span>Condições de uso</span><input required maxLength={300} placeholder="Ex.: apresentar cadastro; não cumulativo" value={draft.conditions} onChange={e => setDraft({ ...draft, conditions: e.target.value })}/></label>
             <label className="auth-field"><span>Válida até</span><input name="expires" type="date" required min={today} value={draft.expires} onChange={e => setDraft({ ...draft, expires: e.target.value })}/></label>
           </div></fieldset>
-          <div className="demo-form-footer"><p className="demo-help">Todos os campos são obrigatórios. Oferta exclusiva da demonstração.</p><div className="demo-actions"><button className="primary" type="submit">{editing ? "Salvar alterações" : "Salvar oferta"}</button>{editing && <button className="auth-secondary" type="button" onClick={() => { setEditing(null); setDraft(emptyOffer); }}>Cancelar edição</button>}</div></div>
+          <div className="demo-form-footer"><p className="demo-help">Todos os campos são obrigatórios. Oferta exclusiva da demonstração.</p><div className="demo-actions"><button className="primary" type="submit">{editing ? "Salvar alterações" : "Salvar oferta"}</button>{editing && <button className="auth-secondary" type="button" onClick={() => { setEditing(null); setDraft(emptyOffer); setMessage("Edição cancelada. A oferta salva foi mantida."); }}>Cancelar edição</button>}</div></div>
         </form>
       </section> : <section className="demo-section">
         <div className="demo-section-heading"><div><span className="demo-step">GESTÃO DE OFERTAS</span><h3>Minhas ofertas ({offers.length})</h3><p>Confira os detalhes e escolha uma ação em cada oferta.</p></div><button className="primary" type="button" onClick={() => { setEditing(null); setDraft(emptyOffer); setPartnerView("create"); }}>Cadastrar nova oferta</button></div>
