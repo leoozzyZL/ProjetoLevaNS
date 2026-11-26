@@ -56,6 +56,7 @@ function ProfileFields({ role, organization, onRoleChange, onOrganizationChange,
 
 type AuthDialogProps = {
   open: boolean;
+  initialDemo?: boolean;
   initialMode: AuthMode;
   initialRole: AccountRole;
   pendingInterest: string;
@@ -121,6 +122,7 @@ function errorMessage(error: unknown) {
 
 export default function AuthDialog({
   open,
+  initialDemo = false,
   initialMode,
   initialRole,
   pendingInterest,
@@ -143,7 +145,7 @@ export default function AuthDialog({
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    setDemoOpen(false);
+    setDemoOpen(initialDemo);
     if (open) {
       setError("");
       setNotice("");
@@ -153,7 +155,7 @@ export default function AuthDialog({
       setEditingProfile(false);
       setSavedProfile(null);
       setOrganization("");
-  }, [open, user?.id]);
+  }, [open, user?.id, initialDemo]);
 
   useEffect(() => {
     if (open) {
@@ -595,10 +597,6 @@ export default function AuthDialog({
             </p>
           </>
         )}
-        {!demoOpen && (mode === "account" || mode === "login") && <div style={{ marginTop: 20, borderTop: "1px solid #d6e7f5", paddingTop: 16 }}>
-          <button className="auth-secondary full" type="button" onClick={() => setDemoOpen(true)}>Explorar painéis de demonstração</button>
-          <p className="auth-muted">Motorista e parceiro: teste os fluxos da apresentação.</p>
-        </div>}
       </section>
     </div>
   );
