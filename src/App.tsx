@@ -386,6 +386,7 @@ export default function App() {
   const [referencesOpen, setReferencesOpen] = useState(false);
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
+  const [demoRequested, setDemoRequested] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [authRole, setAuthRole] = useState<AccountRole>("Passageiro");
   const [pendingInterest, setPendingInterest] = useState("");
@@ -433,6 +434,7 @@ export default function App() {
   }
 
   function openAuth(mode: AuthMode, role: AccountRole = "Passageiro", interest = "") {
+    setDemoRequested(false);
     setAuthMode(authUser ? "account" : mode);
     setAuthRole(role);
     setPendingInterest(interest);
@@ -498,6 +500,12 @@ export default function App() {
           <button onClick={() => scrollTo("beneficios")}>Benefícios</button>
           <button onClick={() => scrollTo("seguranca")}>Segurança</button>
           <button onClick={() => scrollTo("planos")}>Planos</button>
+          <button onClick={() => {
+            setDemoRequested(true);
+            setAuthMode(authUser ? "account" : "login");
+            setAuthOpen(true);
+            setMenu(false);
+          }}>Demonstração</button>
           <button
             className="mobile-auth-link"
             onClick={() => openAuth(authUser ? "account" : "login")}
@@ -1305,6 +1313,7 @@ export default function App() {
 
       <AuthDialog
         open={authOpen}
+        initialDemo={demoRequested}
         initialMode={authMode}
         initialRole={authRole}
         pendingInterest={pendingInterest}
