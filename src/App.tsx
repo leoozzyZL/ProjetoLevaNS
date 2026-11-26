@@ -506,28 +506,29 @@ export default function App() {
             setAuthOpen(true);
             setMenu(false);
           }}>Demonstração</button>
-          <button
-            className="mobile-auth-link"
-            onClick={() => openAuth(authUser ? "account" : "login")}
-          >
-            {authUser ? "Minha conta" : "Entrar"}
-          </button>
+          {!authUser && (
+            <button className="mobile-auth-link" onClick={() => openAuth("login")}>
+              Entrar
+            </button>
+          )}
           <button
             className="mobile-create-account"
             onClick={() => openAuth(authUser ? "account" : "signup")}
           >
-            {authUser ? "Ver conta" : "Criar conta"}
+            {authUser ? "Minha conta" : "Criar conta"}
           </button>
         </nav>
         <div className="header-actions">
-          <button className="link-button" onClick={() => openAuth(authUser ? "account" : "login")}>
-            {authUser ? "Minha conta" : "Entrar"}
-          </button>
+          {!authUser && (
+            <button className="link-button" onClick={() => openAuth("login")}>
+              Entrar
+            </button>
+          )}
           <button
             className="primary small"
             onClick={() => openAuth(authUser ? "account" : "signup")}
           >
-            {authUser ? "Ver conta" : "Criar conta"}
+            {authUser ? "Minha conta" : "Criar conta"}
           </button>
           <button
             className="menu-button"
