@@ -145,7 +145,7 @@ export default function AuthDialog({
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    setDemoOpen(initialDemo);
+    setDemoOpen(initialDemo && Boolean(user));
     if (open) {
       setError("");
       setNotice("");
@@ -159,10 +159,10 @@ export default function AuthDialog({
 
   useEffect(() => {
     if (open) {
-      setMode(initialMode);
+      setMode(initialDemo && !user && initialMode === "account" ? "login" : initialMode);
       setRole(initialRole);
     }
-  }, [initialMode, initialRole, open]);
+  }, [initialMode, initialRole, initialDemo, user?.id, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -324,7 +324,7 @@ export default function AuthDialog({
           ×
         </button>
 
-        {demoOpen ? <OperationalDemo key={user?.id || "visitor"} scope={user?.id || "visitor"} initialRole={accountRole} onBack={() => setDemoOpen(false)} /> : mode === "account" && !user ? (
+        {demoOpen && user ? <OperationalDemo key={user.id} scope={user.id} initialRole={accountRole} onBack={() => setDemoOpen(false)} /> : mode === "account" && !user ? (
           <>
             <span className="auth-kicker">LEVA NÓS</span>
             <h2 id="auth-title">Abrindo sua conta</h2>
@@ -547,7 +547,7 @@ export default function AuthDialog({
           <>
             <span className="auth-kicker">BEM-VINDO DE VOLTA</span>
             <h2 id="auth-title">Acesse sua conta</h2>
-            <p className="auth-intro">Entre para acompanhar seus dados e interesses na Leva Nós.</p>
+            <p className="auth-intro">{initialDemo ? "Entre ou crie sua conta para acessar os simuladores da demonstração." : "Entre para acompanhar seus dados, interesses e simular viagens na Leva Nós."}</p>
             <form className="auth-form" onSubmit={submit}>
               <label className="auth-field">
                 <span>E-mail</span>
