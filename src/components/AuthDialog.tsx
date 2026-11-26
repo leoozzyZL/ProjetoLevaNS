@@ -130,7 +130,7 @@ export default function AuthDialog({
   onClose,
   onModeChange,
 }: AuthDialogProps) {
-  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(initialDemo && Boolean(user));
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [role, setRole] = useState<AccountRole>(initialRole);
   const [fullName, setFullName] = useState("");
