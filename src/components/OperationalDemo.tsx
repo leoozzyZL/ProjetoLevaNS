@@ -100,7 +100,7 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
       <button type="button" aria-pressed={tab === "driver"} onClick={() => { setTab("driver"); setMessage(""); }}><strong>Motorista</strong><span>Pedidos, corridas e ganhos</span></button>
       <button type="button" aria-pressed={tab === "partner"} onClick={() => { setTab("partner"); setMessage(""); }}><strong>Parceiro</strong><span>Cadastro e gestão de ofertas</span></button>
     </div>
-    <aside className="demo-notice"><strong>Demonstração acadêmica · Projeto A3</strong><p>Dados, pedidos e valores fictícios. Nenhuma corrida ou oferta é enviada a outras pessoas. Teste os três perfis sem criar conta. Os dados ficam neste navegador, separados por conta; cada perfil explora seu próprio cenário de demonstração.</p></aside>
+    <aside className="demo-notice"><strong>Demonstração acadêmica · Projeto A3</strong><p>Dados, pedidos e valores fictícios. Nenhuma corrida ou oferta é enviada a outras pessoas. Com sua conta, teste os três perfis de demonstração. Os dados ficam neste navegador, separados por conta; cada perfil explora seu próprio cenário de demonstração.</p></aside>
     {message && <p className="auth-message success" role="status">{message}</p>}
     {(passengerStore.warning || ridesStore.warning || offersStore.warning) && <p role="alert">{passengerStore.warning || ridesStore.warning || offersStore.warning}</p>}
     {tab === "passenger" ? <div className="demo-driver-grid demo-passenger-grid">
