@@ -6,7 +6,7 @@
 .demo-heading .auth-kicker { margin-bottom: 12px; }
 .demo-heading h2 { font-size: 34px; margin-bottom: 12px; }
 .demo-heading > p { color: #60778e; }
-.demo-profile-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.demo-profile-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
 .demo-profile-tabs button { border: 1px solid #d6e5f1; background: white; padding: 20px 24px; border-radius: 14px; text-align: left; color: #345775; }
 .demo-profile-tabs strong { display: block; font-size: 18px; }
 .demo-profile-tabs span { display: block; font-size: 13px; margin-top: 5px; }
@@ -98,4 +98,22 @@
  .demo-price .demo-earning { flex-direction: column; gap: 6px; }
  .demo-actions { flex-direction: column; }
  .demo-actions button { flex: auto; width: 100%; }
+}
+
+.demo-passenger-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.demo-passenger-route { margin-top: 26px; }
+.demo-trip-facts { color: #52738f; font-size: 13px; margin-bottom: 20px !important; }
+.demo-timeline { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0; margin: 0 0 28px; list-style: none; }
+.demo-timeline li { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #73879a; }
+.demo-timeline li > span { display: grid; place-items: center; border: 1px solid #d9e4ec; border-radius: 50%; width: 25px; height: 25px; flex-shrink: 0; }
+.demo-timeline .reached { color: #126cae; font-weight: 700; }
+.demo-timeline .reached > span { background: #e6f3ff; border-color: #53a3dc; }
+.demo-timeline [aria-current="step"] > span { background: #0879c9; color: white; }
+.demo-complete { margin-top: 24px !important; padding: 18px; background: #edf8f3; color: #176448; border-radius: 10px; }
+@media (max-width: 850px) { .demo-passenger-grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) {
+ .demo-profile-tabs { gap: 6px; }
+ .demo-profile-tabs button { padding: 14px 6px; text-align: center; }
+ .demo-profile-tabs strong { font-size: 13px; }
+ .demo-profile-tabs button > span { display: none; }
 }
