@@ -413,6 +413,14 @@ export default function App() {
     return () => authListener.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!authUser) {
+      setTrip(false);
+      setTripEstimate(null);
+      setTripError("");
+    }
+  }, [authUser?.id]);
+
   const filteredPartners = useMemo(
     () =>
       partners.filter((partner) => {
@@ -463,6 +471,7 @@ export default function App() {
 
   async function submitTrip(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!authUser) { openAuth("login"); return; }
     if (!origin.trim() || !destination.trim()) return;
 
     setTripLoading(true);
@@ -589,7 +598,7 @@ export default function App() {
               </button>
             </div>
             {audience === "passageiro" ? (
-              !trip ? (
+              !trip || !authUser ? (
                 <form onSubmit={submitTrip}>
                   <h2>Para onde vamos?</h2>
                   <p>Simule sua próxima viagem em poucos passos.</p>
@@ -635,8 +644,8 @@ export default function App() {
                     />
                     <i />
                   </label>
-                  <button className="primary full" type="submit" disabled={tripLoading}>
-                    {tripLoading ? "Calculando estimativa..." : "Calcular estimativa"}
+                  <button className="primary full" type={authUser ? "submit" : "button"} disabled={tripLoading} onClick={!authUser ? () => openAuth("login") : undefined}>
+                    {tripLoading ? "Calculando estimativa..." : authUser ? "Calcular estimativa" : "Entrar para simular"}
                     {!tripLoading && <Icon name="arrow" />}
                   </button>
                   {tripError && (
@@ -645,7 +654,7 @@ export default function App() {
                     </p>
                   )}
                   <small className="availability">
-                    A simulação aceita somente endereços em Natal, RN. Informe o local e o bairro.
+                    {authUser ? "A simulação aceita somente endereços em Natal, RN. Informe o local e o bairro." : "Entre ou crie sua conta gratuitamente para simular uma viagem em Natal, RN."}
                   </small>
                 </form>
               ) : (
