@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import OperationalDemo from "./OperationalDemo";
 import type { User } from "@supabase/supabase-js";
 import { isAuthConfigured, supabase } from "../lib/supabase";
 
@@ -127,6 +128,7 @@ export default function AuthDialog({
   onClose,
   onModeChange,
 }: AuthDialogProps) {
+  const [demoOpen, setDemoOpen] = useState(false);
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [role, setRole] = useState<AccountRole>(initialRole);
   const [fullName, setFullName] = useState("");
@@ -141,6 +143,7 @@ export default function AuthDialog({
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
+    setDemoOpen(false);
     if (open) {
       setError("");
       setNotice("");
@@ -319,7 +322,7 @@ export default function AuthDialog({
           ×
         </button>
 
-        {mode === "account" && !user ? (
+        {demoOpen ? <OperationalDemo key={user?.id || "visitor"} scope={user?.id || "visitor"} initialRole={accountRole} onBack={() => setDemoOpen(false)} /> : mode === "account" && !user ? (
           <>
             <span className="auth-kicker">LEVA NÓS</span>
             <h2 id="auth-title">Abrindo sua conta</h2>
@@ -592,6 +595,10 @@ export default function AuthDialog({
             </p>
           </>
         )}
+        {!demoOpen && (mode === "account" || mode === "login") && <div style={{ marginTop: 20, borderTop: "1px solid #d6e7f5", paddingTop: 16 }}>
+          <button className="auth-secondary full" type="button" onClick={() => setDemoOpen(true)}>Explorar painéis de demonstração</button>
+          <p className="auth-muted">Motorista e parceiro: teste os fluxos da apresentação.</p>
+        </div>}
       </section>
     </div>
   );
