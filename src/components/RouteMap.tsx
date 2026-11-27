@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import type { Map as LeafletMap } from "leaflet";
+import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
 import { getMapRoute } from "../lib/tripRouting";
 import "leaflet/dist/leaflet.css";
 import "./RouteMap.css";
 
-type Props = { origin: string; destination: string; coordinates?: [number, number][] };
+type Props = { origin: string; destination: string; coordinates?: [number, number][]; vehicleProgress?: number };
 
-export default function RouteMap({ origin, destination, coordinates }: Props) {
+export default function RouteMap({ origin, destination, coordinates, vehicleProgress }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
+  const carRef = useRef<LeafletMarker | null>(null);
+  const [roadPoints, setRoadPoints] = useState<[number, number][]>([]);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [tilesUnavailable, setTilesUnavailable] = useState(false);
@@ -20,6 +22,7 @@ export default function RouteMap({ origin, destination, coordinates }: Props) {
     setStatus("loading");
     setTilesUnavailable(false);
     setRoadSummary("");
+    setRoadPoints([]);
     async function draw() {
       try {
         const [L, route] = await Promise.all([
@@ -48,6 +51,7 @@ export default function RouteMap({ origin, destination, coordinates }: Props) {
             icon: L.divIcon({ className: `route-map-pin pin-${letter}`, html: String(letter), iconSize: [30, 30], iconAnchor: [15, 15] }),
           }).bindPopup(text).addTo(map);
         });
+        setRoadPoints(points);
         map.fitBounds(line.getBounds(), { padding: [28, 28], maxZoom: 15 });
         observer = new ResizeObserver(() => { if (!disposed) map.invalidateSize({ pan: false }); });
         observer.observe(container.current);
@@ -58,8 +62,28 @@ export default function RouteMap({ origin, destination, coordinates }: Props) {
       }
     }
     void draw();
-    return () => { disposed = true; observer?.disconnect(); mapRef.current?.remove(); mapRef.current = null; };
+    return () => { disposed = true; observer?.disconnect(); mapRef.current?.remove(); mapRef.current = null; carRef.current = null; };
   }, [origin, destination, coordinates, attempt]);
+
+  useEffect(() => {
+    if (!mapRef.current || !roadPoints.length) return;
+    if (vehicleProgress === undefined) { carRef.current?.remove(); carRef.current = null; return; }
+    let disposed = false;
+    void import("leaflet").then(L => {
+      if (disposed || !mapRef.current) return;
+      const fraction = Math.max(0, Math.min(100, vehicleProgress)) / 100;
+      const segments = roadPoints.slice(1).map((point, i) => L.latLng(roadPoints[i][1], roadPoints[i][0]).distanceTo(L.latLng(point[1], point[0])));
+      let remaining = segments.reduce((sum, value) => sum + value, 0) * fraction;
+      let index = 0;
+      while (index < segments.length - 1 && remaining > segments[index]) { remaining -= segments[index]; index++; }
+      const ratio = segments[index] ? remaining / segments[index] : 0;
+      const from = roadPoints[index], to = roadPoints[index + 1] || from;
+      const position = L.latLng(from[1] + (to[1] - from[1]) * ratio, from[0] + (to[0] - from[0]) * ratio);
+      if (carRef.current) carRef.current.setLatLng(position);
+      else carRef.current = L.marker(position, { title: "Veículo fictício · posição simulada", alt: "Veículo fictício · posição simulada", zIndexOffset: 1000, icon: L.divIcon({ className: "route-map-vehicle", html: "V", iconSize: [32, 32], iconAnchor: [16, 16] }) }).addTo(mapRef.current);
+    });
+    return () => { disposed = true; };
+  }, [vehicleProgress, roadPoints]);
 
   return <figure className="route-map" aria-label={`Mapa do trajeto de ${origin} para ${destination}`}>
     <div className="route-map-heading"><strong>Trajeto no mapa</strong><span>A · Partida &nbsp; B · Chegada</span></div>
@@ -69,6 +93,6 @@ export default function RouteMap({ origin, destination, coordinates }: Props) {
       {status === "error" && <div className="route-map-overlay" role="status"><p>Não foi possível carregar o mapa agora. O resumo da viagem continua disponível.</p><button type="button" onClick={() => setAttempt(value => value + 1)}>Tentar novamente</button></div>}
     </div>
     {tilesUnavailable && status === "ready" && <p className="route-map-notice" role="status">O mapa de fundo está indisponível. A linha do trajeto continua visível. <button type="button" onClick={() => setAttempt(value => value + 1)}>Recarregar mapa</button></p>}
-    <figcaption>{roadSummary && <span>{roadSummary}. </span>}Rota de carro por OSRM. Mapa ilustrativo da viagem simulada, sem rastreamento ao vivo. Nos exemplos, a rota real do mapa pode diferir dos valores fictícios do cenário.</figcaption>
+    <figcaption>{roadSummary && <span>{roadSummary}. </span>}{vehicleProgress !== undefined && <span>V · posição fictícia do veículo, atualizada pelos controles da apresentação. </span>}Rota de carro por OSRM. Mapa ilustrativo da viagem simulada, sem rastreamento ao vivo. Nos exemplos, a rota real do mapa pode diferir dos valores fictícios do cenário.</figcaption>
   </figure>;
 }
