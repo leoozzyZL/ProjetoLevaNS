@@ -1,19 +1,37 @@
 # Apresentação A3 — Leva Nós
 
-Acesse https://levanos.vercel.app/, entre em uma conta e abra **Demonstração** no menu. A conta continua obrigatória; os três perfis são papéis de teste do mesmo cenário, não outras pessoas conectadas. A aba inicial respeita o perfil da conta.
+Acesse https://levanos.vercel.app/, entre em uma conta e abra **Demonstração** no menu. Cada conta acessa exclusivamente o perfil escolhido no cadastro. Não existe seletor para abrir o painel de outro perfil, e a edição dos dados mantém o perfil do cadastro.
 
-## Roteiro sugerido
+O convite **Criar minha conta / Já tenho uma conta** aparece apenas para visitantes deslogados. A página inicial também mostra funções compatíveis com o perfil autenticado.
 
-1. **Motorista:** simule o envio de CNH, documento do veículo e antecedentes. Nenhum documento real é solicitado.
-2. **Central da banca:** aprove o cadastro fictício. Opcionalmente configure a comissão inicial de 3% após a isenção proposta; o padrão é 0% para o fundador.
-3. **Motorista → Viagem e painel:** simule a selfie e clique em **Ficar disponível**.
-4. **Passageiro:** simule a identidade, escolha um trajeto em Natal, categoria, preferência de condutora e pagamento. Confira o total e clique em **Confirmar viagem fictícia**.
-5. **Motorista:** o mesmo pedido aparece com a mesma referência, preço, destino e pagamento. Aceite ou recuse. A recusa mantém a solicitação aberta para o próximo candidato elegível; cada candidato é identificado no painel.
-6. Depois de aceitar, simule o deslocamento ao embarque duas vezes. Abra **Passageiro** para consultar o PIN de quatro dígitos. Volte a **Motorista**, digite-o e inicie. PIN errado bloqueia a partida.
-7. Avance o percurso em quatro etapas. As duas abas refletem o mesmo progresso e marcador V no mapa. O passageiro pode simular posições recebidas, mas os comandos de aceite, início e conclusão pertencem ao motorista.
-8. Teste o chat trocando de perfil para responder; teste a chamada fictícia, o cartão do contato de confiança e o botão de ajuda. Em **Ajuda e segurança**, simule parada longa/desvio ou abra um protocolo. Em **Central da banca**, revise o alerta e responda ao protocolo. A resposta aparece somente no perfil que abriu o chamado.
-9. Conclua a corrida como motorista. Consulte o pagamento simulado, avalie de ambos os lados, confira histórico e ganhos e simule um saque Pix. Não existe saque duplo do mesmo saldo.
-10. **Parceiro:** cadastre uma oferta com validade futura, edite, pause e reative. As ofertas ativas e não expiradas aparecem na vitrine de benefícios das abas Passageiro e Motorista.
+## Roteiro por perfil
+
+Para apresentar perfis diferentes, use contas distintas, uma de cada perfil. A demonstração não conecta essas contas entre si; as outras pessoas de cada cenário são fictícias.
+
+### Conta de passageiro
+
+1. Abra **Demonstração**, valide a identidade fictícia e escolha trajeto, categoria, preferência de condutora e pagamento.
+2. Confira o total e clique em **Confirmar viagem fictícia**.
+3. Use **Simular próxima etapa** para receber o aceite do motorista fictício, duas atualizações de aproximação, confirmação do embarque, quatro avanços de percurso e conclusão. Você acompanha atualizações, sem acessar os controles do motorista.
+4. Consulte o PIN, o veículo e o mapa. Teste o chat e **Simular resposta recebida**, chamada fictícia, contato de confiança, alerta e avaliação.
+5. Em **Ajuda e segurança**, abra um protocolo e use **Simular retorno do atendimento** para receber uma resposta fictícia, sem acesso ao painel da equipe.
+
+### Conta de motorista
+
+1. Simule o envio dos documentos. Abra **Simular análise do cadastro / Configurações da simulação** e aprove os exemplos fictícios.
+2. Volte a **Viagem e painel**, simule a selfie e clique em **Ficar disponível**.
+3. Use **Simular recebimento de pedido**. Confira o trajeto, valor, comissão e ganho; aceite ou recuse. A recusa oferece o pedido ao próximo candidato fictício.
+4. Simule o deslocamento ao embarque duas vezes. Use **Simular passageiro informando o PIN**, digite os quatro dígitos recebidos e inicie. PIN incorreto continua bloqueando o início.
+5. Avance o percurso quatro vezes e conclua. Consulte histórico, ganhos, avaliações e saque Pix fictício. Chat e suporte têm respostas simuladas no próprio painel.
+6. As configurações de apresentação deste perfil permitem variar as premissas e testar a análise fictícia de documentos e alertas. Não são permissões administrativas reais.
+
+### Conta de parceiro local
+
+Abra **Demonstração** ou **Gerenciar minhas ofertas**. Cadastre nome do negócio, título, categoria, benefício, condições e validade. Salve, edite, pause e reative suas ofertas. Essa conta não acessa simuladores de passageiros ou motoristas.
+
+### Conta de universidade
+
+Acesse o espaço institucional e os dados/interesses da instituição. Esse cadastro não abre simuladores de passageiros ou motoristas nem a gestão de ofertas de negócios.
 
 ## Como explicar os valores
 
@@ -33,11 +51,11 @@ Exemplo Essencial UFRN → Midway: 5,1 km × R$ 2 = R$ 10,20 de viagem. Com taxa
 
 **Real:** autenticação existente pelo Supabase, mapa OpenStreetMap, roteamento OSRM e links externos do Google Maps/Waze. O desenho do mapa depende da internet; a falha do mapa não bloqueia os botões e o resumo. Os tempos e distâncias dos três exemplos são fixados para repetibilidade e podem diferir do cálculo atual do mapa.
 
-**Simulado:** localização e deslocamento do veículo, pareamento, espera, pagamentos, cupons, saque, documentos, antecedentes, selfie, chamada (sem áudio), atendimento, monitoramento e avaliações. O contato de confiança é um cartão de acompanhamento no mesmo painel, sem link público. Não há acionamento de autoridades, central real 24h, análise antifraude externa, cobrança ou transferência.
+**Simulado:** localização e deslocamento do veículo, pareamento, espera, pagamentos, cupons, saque, documentos, antecedentes, selfie, respostas recebidas de outros participantes, chamada (sem áudio), atendimento, monitoramento e avaliações. O contato de confiança é um cartão de acompanhamento no mesmo painel, sem link público. Não há acionamento de autoridades, central real 24h, análise antifraude externa, cobrança ou transferência.
 
-O cenário fica no armazenamento local deste navegador, separado pelo ID da conta. Não conecta passageiros e motoristas em aparelhos ou contas diferentes. Alterações são refletidas entre abas do mesmo navegador/origem, mas o armazenamento local não é uma infraestrutura para concorrência de usuários reais. A central da banca só altera esse cenário, sem privilégios administrativos no Supabase. Não envie documentos, dados bancários ou informações pessoais nos campos de teste.
+O cenário fica no armazenamento local deste navegador, separado pelo ID da conta e perfil. O cenário compartilhado anterior é usado apenas como origem de migração, sem botões de troca de perfil. Não conecta passageiros e motoristas em aparelhos ou contas diferentes. Alterações são refletidas entre abas do mesmo perfil, conta e navegador/origem, mas o armazenamento local não é uma infraestrutura para concorrência de usuários reais. As configurações do motorista só alteram seu cenário, sem privilégios administrativos no Supabase. Não envie documentos, dados bancários ou informações pessoais nos campos de teste.
 
-Registros da demonstração anterior continuam disponíveis no histórico legado; não entram nos ganhos do novo cenário. As ofertas existentes foram preservadas. O login e a área **Quero viajar** da página inicial foram mantidos.
+Registros da demonstração anterior continuam disponíveis no histórico legado; não entram nos ganhos do novo cenário. As ofertas existentes foram preservadas na conta de parceiro. Não há publicação dessas ofertas em outras contas da demonstração. O login e a área **Quero viajar** da página inicial foram mantidos.
 
 ## Verificação técnica
 
