@@ -47,28 +47,29 @@ function representsOrganization(role: AccountRole) {
   return role === "Parceiro local" || role === "Universidade";
 }
 
-function ProfileFields({ role, organization, onRoleChange, onOrganizationChange, disabled = false }: {
+function ProfileFields({ role, organization, onRoleChange, onOrganizationChange, disabled = false, fixedRole = false }: {
   role: AccountRole;
   organization: string;
   onRoleChange: (role: AccountRole) => void;
   onOrganizationChange: (value: string) => void;
   disabled?: boolean;
+  fixedRole?: boolean;
 }) {
   return (
     <>
       <label className="auth-field">
-        <span>Como você quer participar?</span>
-        <select value={role} disabled={disabled} aria-describedby="profile-description" onChange={(event) => {
+        <span>{fixedRole ? "Perfil da sua conta" : "Como você quer participar?"}</span>
+        {fixedRole ? <input value={profileOptions[role].label} readOnly aria-describedby="profile-description"/> : <select value={role} disabled={disabled} aria-describedby="profile-description" onChange={(event) => {
           onRoleChange(validRole(event.target.value));
           onOrganizationChange("");
         }}>
           {(Object.keys(profileOptions) as AccountRole[]).map((value) => (
             <option key={value} value={value}>{profileOptions[value].label}</option>
           ))}
-        </select>
+        </select>}
       </label>
       <p className="auth-muted" id="profile-description" aria-live="polite" style={{ margin: 0 }}>{profileOptions[role].description}</p>
-      {role === "Universidade" && <p className="auth-muted" style={{ margin: 0 }}>Se você é estudante e quer utilizar viagens, escolha Passageiro.</p>}
+      {!fixedRole && role === "Universidade" && <p className="auth-muted" style={{ margin: 0 }}>Se você é estudante e quer utilizar viagens, escolha Passageiro.</p>}
       {representsOrganization(role) && (
         <label className="auth-field">
           <span>{role === "Universidade" ? "Nome da instituição" : "Nome do negócio"}</span>
@@ -341,16 +342,17 @@ export default function AuthDialog({
       setError("Entre na sua conta para corrigir o perfil.");
       return;
     }
+    const profileRole = validRole(user.user_metadata?.role);
     if (fullName.trim().length < 2) { setError("Informe seu nome com pelo menos 2 caracteres."); return; }
     if (!validPhone(phone)) { setError("Informe um telefone válido com DDD ou deixe o campo vazio."); return; }
-    if (representsOrganization(role) && !organization.trim()) {
-      setError(role === "Universidade" ? "Informe o nome da instituição." : "Informe o nome do negócio.");
+    if (representsOrganization(profileRole) && !organization.trim()) {
+      setError(profileRole === "Universidade" ? "Informe o nome da instituição." : "Informe o nome do negócio.");
       return;
     }
     setBusy(true);
     try {
       const { data, error: profileError } = await supabase.auth.updateUser({
-        data: { full_name: fullName.trim(), contact_phone: phone.trim() ? "+55" + phoneDigits(phone) : null, role, organization_name: representsOrganization(role) ? organization.trim() : null },
+        data: { full_name: fullName.trim(), contact_phone: phone.trim() ? "+55" + phoneDigits(phone) : null, role: profileRole, organization_name: representsOrganization(profileRole) ? organization.trim() : null },
       });
       if (profileError) throw profileError;
       if (!data.user) throw new Error("Perfil não retornado");
@@ -397,7 +399,7 @@ export default function AuthDialog({
           ×
         </button>
 
-        {demoOpen && user ? <OperationalDemo key={user.id} scope={user.id} initialRole={accountRole} onBack={() => setDemoOpen(false)} /> : mode === "account" && !user ? (
+        {demoOpen && user ? <OperationalDemo key={`${user.id}:${accountRole}`} scope={user.id} initialRole={accountRole} onBack={() => setDemoOpen(false)} /> : mode === "account" && !user ? (
           <>
             <span className="auth-kicker">LEVA NÓS</span>
             <h2 id="auth-title">Abrindo sua conta</h2>
@@ -421,7 +423,7 @@ export default function AuthDialog({
                 <label className="auth-field"><span>Nome</span><input autoComplete="name" value={fullName} onChange={event => setFullName(event.target.value)} minLength={2} maxLength={100} required disabled={busy}/></label>
                 <PhoneField value={phone} onChange={setPhone} disabled={busy}/>
                 <label className="auth-field"><span>E-mail de acesso</span><input type="email" value={user.email || ""} readOnly disabled/><small className="auth-contact-help">Seu e-mail de acesso é mantido nesta edição.</small></label>
-                <ProfileFields role={role} organization={organization} onRoleChange={setRole} onOrganizationChange={setOrganization} disabled={busy} />
+                <ProfileFields role={accountRole} organization={organization} onRoleChange={setRole} onOrganizationChange={setOrganization} disabled={busy} fixedRole />
                 <button className="primary full" type="submit" disabled={busy}>{busy ? "Salvando perfil…" : "Salvar perfil"}</button>
                 <button className="auth-text-button full" type="button" disabled={busy} onClick={() => { setEditingProfile(false); setError(""); }}>Cancelar</button>
               </form>

@@ -65,15 +65,15 @@ export function transition(s: Scenario, a: Action, at = new Date().toISOString()
   const changeTrip = (next: Trip, message: string) => ok({ trips: s.trips.map(v => v.id === next.id ? { ...next, events: [...next.events, { at, text: message }] } : v) }, message);
   switch (a.type) {
     case 'verify': return ok({ passengerVerified: true }, 'Identidade fictícia do passageiro validada. Nenhum documento real foi coletado.');
-    case 'documents': return ok({ documents: 'Em análise', selfie: false, online: false }, 'CNH, veículo e antecedentes fictícios enviados. Abra a Central da banca para aprovar o cadastro.');
-    case 'approve': if (s.documents !== 'Em análise') return fail('Envie os documentos fictícios na aba Motorista antes da análise.'); return ok({ documents: a.approved ? 'Aprovado' : 'Rejeitado', online: false, selfie: false }, a.approved ? 'Cadastro fictício aprovado. O motorista pode simular a selfie e ficar disponível.' : 'Cadastro fictício rejeitado. O motorista pode reenviar os exemplos.');
-    case 'selfie': if (s.documents !== 'Aprovado') return fail('Aguarde a aprovação dos documentos na Central da banca.'); return ok({ selfie: true }, 'Checagem facial fictícia aprovada para este turno. Sem câmera ou reconhecimento real.');
+    case 'documents': return ok({ documents: 'Em análise', selfie: false, online: false }, 'CNH, veículo e antecedentes fictícios enviados. Abra Configurações da simulação para aprovar o cadastro.');
+    case 'approve': if (s.documents !== 'Em análise') return fail('Envie os documentos fictícios no seu painel antes da análise.'); return ok({ documents: a.approved ? 'Aprovado' : 'Rejeitado', online: false, selfie: false }, a.approved ? 'Cadastro fictício aprovado. O motorista pode simular a selfie e ficar disponível.' : 'Cadastro fictício rejeitado. O motorista pode reenviar os exemplos.');
+    case 'selfie': if (s.documents !== 'Aprovado') return fail('Aguarde a aprovação dos documentos em Configurações da simulação.'); return ok({ selfie: true }, 'Checagem facial fictícia aprovada para este turno. Sem câmera ou reconhecimento real.');
     case 'online': if (s.documents !== 'Aprovado' || !s.selfie) return fail('Conclua a aprovação e a selfie fictícia antes de ficar disponível.'); if (t && ['Aceita', 'Em andamento'].includes(t.status) && s.online) return fail('Finalize ou cancele a viagem antes de encerrar o turno.'); return ok({ online: !s.online, selfie: s.online ? false : s.selfie }, s.online ? 'Turno encerrado. Uma nova selfie fictícia será necessária.' : 'Motorista disponível na demonstração.');
     case 'destination': return ok({ destination: a.value }, 'Filtro de destino atualizado para os próximos pedidos.');
     case 'settings': if (!Number.isFinite(a.config.perKm) || a.config.perKm <= 0 || a.config.perKm > 10 || !Number.isFinite(a.config.fee) || a.config.fee < 0 || a.config.fee > 5 || ![0, .03].includes(a.config.rate) || !['normal', 'alta', 'pico'].includes(a.config.demand)) return fail('Use tarifa entre R$ 0,01 e R$ 10, taxa entre R$ 0 e R$ 5 e comissão de 0% ou 3%.'); return ok({ config: a.config }, 'Premissas salvas apenas na demonstração. Viagens já confirmadas mantêm o preço e a comissão originais.');
     case 'request': case 'receive': {
       if (s.trips.some(isActive)) {
-        if (a.type === 'receive' && t?.status === 'Solicitada') return ok({}, 'O pedido do passageiro já está disponível aqui. É o mesmo pedido nas duas abas.');
+        if (a.type === 'receive' && t?.status === 'Solicitada') return ok({}, 'O pedido do passageiro já está disponível aqui. É o mesmo pedido no acompanhamento da viagem.');
         return fail('Há uma viagem em aberto. Conclua ou cancele antes de criar outra.');
       }
       if (a.type === 'request' && !s.passengerVerified) return fail('Simule a validação de identidade antes de confirmar.');
@@ -82,7 +82,7 @@ export function transition(s: Scenario, a: Action, at = new Date().toISOString()
       if (a.choice.payment === 'Dinheiro' && (!Number.isFinite(a.choice.cash) || (a.choice.cash !== 0 && a.choice.cash < price.total))) return fail('Informe troco para um valor maior ou igual ao total, ou zero para valor exato.');
       const route = routes[a.choice.route];
       const trip: Trip = { ...route, id: a.id, route: a.choice.route, category: a.choice.category, women: a.choice.women, payment: a.choice.payment, cash: a.choice.payment === 'Dinheiro' ? a.choice.cash : 0, quote: price, pin: a.pin, status: 'Solicitada', assigned: null, declined: [], progress: 0, pickup: 0, paid: false, chat: [], ratings: {}, events: [{ at, text: 'Viagem fictícia solicitada' }] };
-      return ok({ trips: [trip, ...s.trips], current: trip.id, shared: null, passengerVerified: s.passengerVerified || a.type === 'receive' }, 'Viagem fictícia solicitada. Passageiro e motorista acompanham o mesmo pedido.');
+      return ok({ trips: [trip, ...s.trips], current: trip.id, shared: null, passengerVerified: s.passengerVerified || a.type === 'receive' }, 'Viagem fictícia solicitada. Acompanhe o pedido no seu painel.');
     }
     case 'accept': {
       if (!t || t.status !== 'Solicitada') return fail('Nenhum pedido aguardando aceite.');
@@ -98,8 +98,8 @@ export function transition(s: Scenario, a: Action, at = new Date().toISOString()
       if (!driver) return fail('Não há candidato elegível para recusar.');
       return changeTrip({ ...t, declined: [...t.declined, driver.id] }, `Pedido recusado por ${driver.name}. A solicitação continua aberta para o próximo candidato fictício.`);
     }
-    case 'start': if (!t || t.status !== 'Aceita') return fail('Aceite a corrida antes de iniciar.'); if (t.pickup < 100) return fail('Simule a chegada ao embarque antes de iniciar.'); if (a.pin !== t.pin) return fail('PIN incorreto. Peça os quatro dígitos exibidos na aba Passageiro.'); return changeTrip({ ...t, status: 'Em andamento', progress: 0 }, 'PIN confirmado. Corrida fictícia iniciada nas duas telas.');
-    case 'move': if (!t || !['Aceita', 'Em andamento'].includes(t.status)) return fail('Aceite uma corrida para simular o deslocamento.'); if (t.status === 'Aceita') return changeTrip({ ...t, pickup: Math.min(100, t.pickup + 50) }, t.pickup >= 50 ? 'Veículo fictício chegou ao ponto de embarque.' : 'Veículo fictício a caminho do embarque.'); return changeTrip({ ...t, progress: Math.min(100, t.progress + 25) }, 'Posição fictícia atualizada no mapa das duas abas.');
+    case 'start': if (!t || t.status !== 'Aceita') return fail('Aceite a corrida antes de iniciar.'); if (t.pickup < 100) return fail('Simule a chegada ao embarque antes de iniciar.'); if (a.pin !== t.pin) return fail('PIN incorreto. Confira os quatro dígitos informados pelo passageiro fictício.'); return changeTrip({ ...t, status: 'Em andamento', progress: 0 }, 'PIN confirmado. Corrida fictícia iniciada.');
+    case 'move': if (!t || !['Aceita', 'Em andamento'].includes(t.status)) return fail('Aceite uma corrida para simular o deslocamento.'); if (t.status === 'Aceita') return changeTrip({ ...t, pickup: Math.min(100, t.pickup + 50) }, t.pickup >= 50 ? 'Veículo fictício chegou ao ponto de embarque.' : 'Veículo fictício a caminho do embarque.'); return changeTrip({ ...t, progress: Math.min(100, t.progress + 25) }, 'Posição fictícia atualizada no mapa da viagem.');
     case 'finish': if (!t || t.status !== 'Em andamento') return fail('Inicie a corrida e valide o PIN antes de concluir.'); if (t.progress < 100) return fail('Simule o percurso até 100% antes de concluir.'); return changeTrip({ ...t, status: 'Concluída', paid: true }, `Corrida concluída. ${t.payment === 'Dinheiro' ? 'Recebimento em dinheiro' : 'Pagamento'} simulado de ${money(t.quote.total)}. Ganho do motorista: ${money(t.quote.net)}.`);
     case 'cancel': if (!t || !isActive(t)) return fail('Não há viagem em aberto para cancelar.'); return changeTrip({ ...t, status: 'Cancelada', paid: false }, 'Viagem fictícia cancelada sem cobrança. Nenhum ganho foi creditado.');
     case 'withdraw': { if (!drivers.some(d => d.id === a.driver)) return fail('Motorista de demonstração inválido.'); const l = ledger(s, a.driver); if (l.balance <= 0) return fail('Não há saldo positivo para saque. Dinheiro recebido já está nas mãos do motorista.'); return ok({ withdrawals: [...s.withdrawals, { id: `saque-${at}`, amount: l.balance, driver: a.driver }] }, `Saque Pix fictício de ${money(l.balance)} registrado. Nenhuma transferência real foi realizada.`); }
@@ -108,7 +108,50 @@ export function transition(s: Scenario, a: Action, at = new Date().toISOString()
     case 'share': if (!t || !isActive(t) || !t.assigned) return fail('O compartilhamento fica disponível após o aceite.'); return ok({ shared: t.id }, 'Cartão de acompanhamento criado. Na apresentação, o contato é simulado neste navegador, sem link público ou dados reais.');
     case 'ticket': if (!a.text.trim()) return fail('Descreva o que precisa de ajuda.'); return ok({ tickets: [{ id: a.id, role: a.role, reason: a.reason, text: a.text.trim().slice(0, 500), trip: t?.id ?? null, status: 'Aberto', reply: '' }, ...s.tickets] }, 'Protocolo fictício aberto. A Central da banca pode assumir e responder; não há atendente real conectado.');
     case 'support': { if (!s.tickets.some(v => v.id === a.id)) return fail('Protocolo não encontrado.'); if (!a.reply.trim()) return fail('Escreva uma resposta ao usuário antes de atualizar o protocolo.'); return ok({ tickets: s.tickets.map(v => v.id === a.id ? { ...v, status: a.status, reply: a.reply.trim().slice(0, 500) } : v) }, 'Protocolo atualizado. A resposta aparece no suporte do perfil que abriu o chamado.'); }
-    case 'incident': if (!t || !['Aceita', 'Em andamento'].includes(t.status)) return fail('Inicie o acompanhamento de uma viagem para simular um alerta.'); return ok({ alerts: [{ id: a.id, trip: t.id, text: a.kind, resolved: false }, ...s.alerts] }, 'Alerta fictício registrado e visível na Central da banca. Nenhuma autoridade ou central real foi acionada.');
+    case 'incident': if (!t || !['Aceita', 'Em andamento'].includes(t.status)) return fail('Inicie o acompanhamento de uma viagem para simular um alerta.'); return ok({ alerts: [{ id: a.id, trip: t.id, text: a.kind, resolved: false }, ...s.alerts] }, 'Alerta fictício registrado e visível em Configurações da simulação. Nenhuma autoridade ou central real foi acionada.');
     case 'resolve': if (!s.alerts.some(v => v.id === a.id)) return fail('Alerta não encontrado.'); return ok({ alerts: s.alerts.map(v => v.id === a.id ? { ...v, resolved: true } : v) }, 'Alerta revisado e encerrado na simulação; registro mantido na auditoria.');
   }
+}
+
+export function demoRoleForAccount(accountRole: string): Role | 'partner' | null {
+  return accountRole === 'Passageiro' ? 'passenger' : accountRole === 'Motorista' ? 'driver' : accountRole === 'Parceiro local' ? 'partner' : null;
+}
+export type RoleAction = Action | { type: 'simulate-update' } | { type: 'simulate-pin' } | { type: 'simulate-chat-reply' } | { type: 'simulate-support'; id: string };
+/** UI permissions for a local academic scenario, not a server authorization boundary. */
+export function transitionForRole(s: Scenario, role: Role, a: RoleAction, at = new Date().toISOString()): ReturnType<typeof transition> {
+  const fail = (message: string) => ({ state: s, message, error: true });
+  const trip = s.trips.find(t => t.id === s.current);
+  if (a.type === 'simulate-update') {
+    if (role !== 'passenger') return fail('Este controle pertence ao acompanhamento do passageiro.');
+    if (!trip || !isActive(trip)) return fail('Confirme uma viagem fictícia para acompanhar as atualizações.');
+    const steps: Action[] = [];
+    if (trip.status === 'Solicitada') {
+      if (s.documents !== 'Aprovado') steps.push({ type: 'documents' }, { type: 'approve', approved: true });
+      if (!s.selfie || s.documents !== 'Aprovado') steps.push({ type: 'selfie' });
+      if (!s.online || s.documents !== 'Aprovado') steps.push({ type: 'online' });
+      steps.push({ type: 'destination', value: 'Qualquer destino' }, { type: 'accept' });
+    } else if (trip.status === 'Aceita') steps.push(trip.pickup < 100 ? { type: 'move' } : { type: 'start', pin: trip.pin });
+    else steps.push(trip.progress < 100 ? { type: 'move' } : { type: 'finish' });
+    let result: ReturnType<typeof transition> = { state: s, message: '' };
+    for (const step of steps) { result = transition(result.state, step, at); if (result.error) return fail(result.message); }
+    return { ...result, message: `Atualização recebida do motorista fictício: ${result.message}` };
+  }
+  if (a.type === 'simulate-pin') {
+    if (role !== 'driver' || trip?.status !== 'Aceita' || trip.pickup < 100) return fail('O passageiro fictício informa o PIN depois da chegada ao embarque.');
+    return transition(s, { type: 'message', role: 'passenger', text: `Meu PIN fictício de embarque é ${trip.pin}.` }, at);
+  }
+  if (a.type === 'simulate-chat-reply') return transition(s, { type: 'message', role: role === 'passenger' ? 'driver' : 'passenger', text: role === 'passenger' ? 'Recebi sua mensagem. Estou seguindo o trajeto combinado. (Resposta fictícia)' : 'Recebi sua mensagem. Estou no ponto de encontro combinado. (Resposta fictícia)' }, at);
+  if (a.type === 'simulate-support') {
+    const ticket = s.tickets.find(t => t.id === a.id && t.role === role);
+    if (!ticket) return fail('Este protocolo não pertence ao seu perfil.');
+    if (ticket.status === 'Resolvido') return fail('Este protocolo já recebeu uma resposta.');
+    return transition(s, { type: 'support', id: a.id, status: 'Resolvido', reply: 'A equipe fictícia conferiu o relato e registrou a orientação no seu protocolo. Atendimento simulado para a apresentação, sem equipe real conectada.' }, at);
+  }
+  const allowed = role === 'passenger'
+    ? ['verify', 'request', 'cancel', 'move', 'message', 'rate', 'share', 'ticket', 'incident']
+    : ['documents', 'approve', 'selfie', 'online', 'receive', 'accept', 'decline', 'start', 'finish', 'cancel', 'move', 'withdraw', 'destination', 'settings', 'resolve', 'support', 'message', 'rate', 'share', 'ticket', 'incident'];
+  if (!allowed.includes(a.type)) return fail('Esta ação não está disponível para o perfil da sua conta.');
+  if ((a.type === 'message' || a.type === 'rate' || a.type === 'ticket') && a.role !== role) return fail('Você só pode enviar ações do perfil da sua conta.');
+  if (a.type === 'support' && !s.tickets.some(t => t.id === a.id && t.role === role)) return fail('Este protocolo não pertence ao seu perfil.');
+  return transition(s, a, at);
 }

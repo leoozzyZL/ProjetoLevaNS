@@ -1,5 +1,6 @@
 import { FormEvent, Suspense, lazy, useState } from "react";
 import "./OperationalDemo.css";
+import { demoRoleForAccount } from "./demoScenario";
 const DemoJourney = lazy(() => import("./DemoJourney"));
 
 // Offers remain scoped to the authenticated account; journeys use a shared local scenario.
@@ -20,7 +21,7 @@ function useDemoStore<T>(key: string, initial: T) {
 }
 
 export default function OperationalDemo({ scope, initialRole, onBack }: { scope: string; initialRole: string; onBack: () => void }) {
-  const [tab, setTab] = useState(initialRole === "Motorista" ? "driver" : initialRole === "Parceiro local" ? "partner" : "passenger");
+  const tab = demoRoleForAccount(initialRole);
   const offersStore = useDemoStore<Offer[]>(`levanos-demo-v1:${scope}:offers`, []);
   const offers = Array.isArray(offersStore.value) ? offersStore.value : [];
   const [draft, setDraft] = useState(emptyOffer);
@@ -41,17 +42,13 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
       <button className="auth-text-button" type="button" onClick={onBack}>← Voltar à conta</button>
       <span className="auth-kicker">DEMONSTRAÇÃO INTERATIVA</span>
       <h2 id="auth-title">Seu painel Leva Nós</h2>
-      <p>Escolha um perfil e explore cada etapa no seu ritmo.</p>
+      <p>Seu espaço de {initialRole.toLocaleLowerCase("pt-BR")}, com as funções do seu cadastro.</p>
     </header>
-    <div className="demo-profile-tabs" role="group" aria-label="Painel de demonstração">
-      <button type="button" aria-pressed={tab === "passenger"} onClick={() => { setTab("passenger"); setMessage(""); }}><strong>Passageiro</strong><span>Trajeto, preço e minha viagem</span></button>
-      <button type="button" aria-pressed={tab === "driver"} onClick={() => { setTab("driver"); setMessage(""); }}><strong>Motorista</strong><span>Pedidos, corridas e ganhos</span></button>
-      <button type="button" aria-pressed={tab === "partner"} onClick={() => { setTab("partner"); setMessage(""); }}><strong>Parceiro</strong><span>Cadastro e gestão de ofertas</span></button>
-    </div>
-    <aside className="demo-notice"><strong>Demonstração acadêmica · Projeto A3</strong><p>Dados, pedidos e valores fictícios. Nenhuma corrida ou oferta é enviada a outras pessoas. Com sua conta, teste os três perfis de demonstração. Os dados ficam neste navegador, separados por conta; passageiro e motorista acompanham a mesma viagem fictícia. A central da banca permite testar aprovação, tarifas, segurança e suporte. Não há cobrança, GPS ao vivo, validação real de documentos ou acionamento de emergência.</p></aside>
+    <p className="demo-badge">Perfil da conta: {initialRole}</p>
+    <aside className="demo-notice"><strong>Demonstração acadêmica · Projeto A3</strong><p>Dados, pedidos e valores fictícios. Nenhuma corrida ou oferta é enviada a outras pessoas. Sua conta acessa somente as funções do perfil cadastrado. Os dados ficam neste navegador, separados por conta e perfil. As outras pessoas da viagem e as respostas do atendimento são simuladas, sem acesso aos painéis delas. Não há cobrança, GPS ao vivo, validação real de documentos ou acionamento de emergência.</p></aside>
     {message && <p className="auth-message success" role="status">{message}</p>}
     {offersStore.warning && <p role="alert">{offersStore.warning}</p>}
-    {tab !== "partner" ? <Suspense fallback={<p role="status">Carregando a demonstração integrada…</p>}><DemoJourney scope={scope} role={tab === "driver" ? "driver" : "passenger"} offers={offers} onSwitch={setTab}/></Suspense> : <>
+    {tab === null ? <section className="demo-section"><h3>Seu espaço institucional</h3><p>O cadastro de universidade acompanha o projeto e os interesses da instituição. Simulações de viagens, operação de motoristas e gestão de negócios pertencem aos respectivos perfis.</p><button className="auth-secondary" type="button" onClick={onBack}>Ver meus dados institucionais</button></section> : tab !== "partner" ? <Suspense fallback={<p role="status">Carregando a demonstração integrada…</p>}><DemoJourney scope={scope} role={tab === "driver" ? "driver" : "passenger"} offers={offers} /></Suspense> : <>
       <div className="demo-subnav" role="group" aria-label="Gestão de ofertas"><button type="button" aria-pressed={partnerView === "create"} onClick={() => setPartnerView("create")}>{editing ? "Editar oferta" : "Cadastrar oferta"}</button><button type="button" aria-pressed={partnerView === "list"} onClick={() => setPartnerView("list")}>Minhas ofertas ({offers.length})</button></div>
       {partnerView === "create" ? <section className="demo-section">
         <span className="demo-step">{editing ? "ATUALIZE SUA OFERTA" : "NOVA OFERTA"}</span><h3>{editing ? "Editar oferta" : "O que seu negócio oferece?"}</h3><p>Preencha os dados abaixo. Ao salvar, você verá a oferta pronta no seu painel.</p>

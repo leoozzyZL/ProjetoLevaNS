@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 const compiled = ts.transpileModule(await readFile(new URL('./demoScenario.ts', import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext } }).outputText;
-const { initialScenario, transition, quote, ledger, candidates } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { initialScenario, transition, quote, ledger, candidates, transitionForRole, demoRoleForAccount } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const choice = { route: 0, category: 'Essencial', women: false, payment: 'Pix', cash: 0, coupon: false };
 const action = (s, a) => transition(s, a, '2026-11-27T12:00:00Z');
 function ready() { let s = initialScenario(); for (const a of [{ type: 'documents' }, { type: 'approve', approved: true }, { type: 'selfie' }, { type: 'online' }, { type: 'verify' }]) s = action(s, a).state; return s; }
@@ -46,4 +46,30 @@ test('chat, ratings, support and alerts follow the same trip and selected profil
  s = action(s, { type: 'message', role: 'passenger', text: 'Estou no embarque' }).state; s = action(s, { type: 'incident', kind: 'Desvio fictício', id: 'alert' }).state; assert.equal(s.trips[0].chat[0].role, 'passenger'); assert.equal(s.alerts[0].trip, 'trip-1');
  s = action(s, { type: 'ticket', role: 'passenger', reason: 'Segurança', text: 'Teste', id: 'ticket' }).state; s = action(s, { type: 'support', id: 'ticket', status: 'Resolvido', reply: 'Resolvido na simulação' }).state; assert.equal(s.tickets[0].trip, 'trip-1'); assert.equal(s.tickets[0].reply, 'Resolvido na simulação');
  s = complete(request(ready())); s = action(s, { type: 'rate', role: 'passenger', stars: 5, tags: ['Limpeza'] }).state; assert.equal(action(s, { type: 'rate', role: 'passenger', stars: 1, tags: [] }).error, true); s = action(s, { type: 'rate', role: 'driver', stars: 4, tags: [] }).state; assert.equal(s.trips[0].ratings.driver.stars, 4);
+});
+
+test('account profiles map to one workspace, with no passenger fallback for institutions or unknown roles', () => {
+ assert.equal(demoRoleForAccount('Passageiro'), 'passenger'); assert.equal(demoRoleForAccount('Motorista'), 'driver'); assert.equal(demoRoleForAccount('Parceiro local'), 'partner'); assert.equal(demoRoleForAccount('Universidade'), null); assert.equal(demoRoleForAccount(''), null);
+});
+test('role permissions reject controls of the other profile and impersonated messages', () => {
+ const s = request(ready());
+ assert.equal(transitionForRole(s, 'driver', { type: 'request', choice, id: 'other', pin: '1111' }).error, true);
+ assert.equal(transitionForRole(s, 'passenger', { type: 'accept' }).error, true);
+ assert.equal(transitionForRole(s, 'passenger', { type: 'approve', approved: true }).error, true);
+ assert.equal(transitionForRole(s, 'driver', { type: 'simulate-update' }).error, true);
+ assert.equal(transitionForRole(s, 'driver', { type: 'message', role: 'passenger', text: 'invasão' }).error, true);
+});
+test('passenger completes own scenario by receiving fictional driver updates without driver controls', () => {
+ let s = request({ ...initialScenario(), passengerVerified: true });
+ for (let i = 0; i < 9; i++) { const result = transitionForRole(s, 'passenger', { type: 'simulate-update' }); assert.notEqual(result.error, true, result.message); s = result.state; }
+ assert.equal(s.trips[0].status, 'Concluída'); assert.equal(s.trips[0].paid, true); assert.equal(transitionForRole(s, 'passenger', { type: 'simulate-update' }).error, true);
+});
+test('driver receives the fictional passenger PIN after arrival and support only resolves own tickets', () => {
+ let s = action(request(ready()), { type: 'accept' }).state;
+ assert.equal(transitionForRole(s, 'driver', { type: 'simulate-pin' }).error, true);
+ for (let i = 0; i < 2; i++) s = action(s, { type: 'move' }).state;
+ s = transitionForRole(s, 'driver', { type: 'simulate-pin' }).state; assert.equal(s.trips[0].chat.at(-1).role, 'passenger'); assert.match(s.trips[0].chat.at(-1).text, /4826/);
+ s = action(s, { type: 'ticket', role: 'passenger', reason: 'Teste', text: 'Somente passageiro', id: 'private-ticket' }).state;
+ assert.equal(transitionForRole(s, 'driver', { type: 'simulate-support', id: 'private-ticket' }).error, true);
+ assert.equal(transitionForRole(s, 'passenger', { type: 'simulate-support', id: 'private-ticket' }).state.tickets[0].status, 'Resolvido');
 });
