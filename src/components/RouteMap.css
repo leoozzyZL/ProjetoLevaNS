@@ -1,0 +1,15 @@
+.route-map { width: 100%; min-width: 0; margin: 20px 0 24px; border: 1px solid #d7e6f1; border-radius: 14px; overflow: hidden; background: #fff; isolation: isolate; }
+.route-map-heading { padding: 13px 15px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 7px; background: #f3f9fe; color: #1c4e75; }
+.route-map-heading strong { font-size: 13px; }
+.route-map-heading span { font-size: 11px; color: #557891; }
+.route-map-stage { position: relative; }
+.route-map-canvas { width: 100%; height: 280px; z-index: 0; background: #edf3f6; }
+.route-map-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 16px; justify-content: center; align-items: center; text-align: center; background: #f0f7fc; color: #486c89; padding: 24px; font-size: 13px; margin: 0 !important; }
+.route-map-overlay button, .route-map-notice button { background: #e2f0fd; color: #0868ac; padding: 8px 14px; border-radius: 8px; font-weight: 700; }
+.route-map figcaption, .route-map-notice { padding: 12px 15px; color: #647e93; font-size: 10px; line-height: 1.6; }
+.route-map-notice { background: #fff5dd; margin: 0 !important; }
+.route-map-pin { display: grid !important; place-items: center; background: #0879ce; color: white; font-weight: 800; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 7px #21496266; }
+.route-map-pin.pin-B { background: #127a58; }
+.route-map .leaflet-control-attribution { font-size: 9px; }
+.route-map .leaflet-popup-content { overflow-wrap: anywhere; }
+@media (max-width: 560px) { .route-map-canvas { height: 240px; } }
