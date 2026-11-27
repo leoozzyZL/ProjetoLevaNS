@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import "./OperationalDemo.css";
+import RouteMap from "./RouteMap";
 
 // Academic sandbox: no dispatch, payments or public offer publication.
 type Ride = { id: string; origin: string; destination: string; km: number; minutes: number; fare: number; rate: number; status: "Novo pedido" | "Aceita" | "Em andamento" | "Concluída" | "Recusada" | "Cancelada" };
@@ -111,6 +112,7 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
           {examples.map((route, index) => <option key={route.origin} value={index}>{route.origin.split(",")[0]} → {route.destination.split(",")[0]}</option>)}
         </select></label>
         <div className="demo-route demo-passenger-route"><div><span>PARTIDA</span><p>{routePreview.origin}</p></div><div><span>CHEGADA</span><p>{routePreview.destination}</p></div></div>
+        <RouteMap origin={routePreview.origin} destination={routePreview.destination} />
         <p className="demo-trip-facts">{routePreview.km.toLocaleString("pt-BR")} km · {routePreview.minutes} min fictícios</p>
         <dl className="demo-price"><div><dt>Valor da viagem</dt><dd>{money(routePreview.fare)}</dd></div><div><dt>Taxa de serviço</dt><dd>{money(1)}</dd></div><div className="demo-earning"><dt>Preço total</dt><dd>{money(round(routePreview.fare + 1))}</dd></div></dl>
         <p className="demo-help">Valores ilustrativos: R$ 2/km + R$ 1 de taxa de serviço. A tarifa por km é uma hipótese de demonstração, não um preço definido no plano de negócios.</p>
@@ -124,6 +126,7 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
           <div className="demo-card-heading"><strong className="demo-badge">{passengerTrip.status}</strong><span>Viagem fictícia</span></div>
           <ol className="demo-timeline" aria-label="Etapas da minha viagem">{passengerStages.map((stage, index) => <li key={stage} className={index <= passengerStages.indexOf(passengerTrip.status) ? "reached" : ""} aria-current={stage === passengerTrip.status ? "step" : undefined}><span>{index + 1}</span>{stage}</li>)}</ol>
           <div className="demo-route"><div><span>PARTIDA</span><p>{passengerTrip.origin}</p></div><div><span>CHEGADA</span><p>{passengerTrip.destination}</p></div></div>
+          <RouteMap origin={passengerTrip.origin} destination={passengerTrip.destination} />
           <p className="demo-trip-facts">{passengerTrip.km.toLocaleString("pt-BR")} km · {passengerTrip.minutes} min fictícios</p>
           <dl className="demo-price"><div><dt>Taxa de serviço incluída</dt><dd>{money(1)}</dd></div><div className="demo-earning"><dt>Total da sua viagem</dt><dd>{money(round(passengerTrip.fare + 1))}</dd></div></dl>
           {passengerTrip.status !== "Concluída" ? <><p className="demo-help">O botão abaixo simula as atualizações que o passageiro receberia. Ele não aceita, inicia ou conclui uma corrida real.</p><button className="primary full" type="button" onClick={advancePassengerTrip}>Simular próxima etapa</button></> : <p className="demo-complete" role="status">Viagem fictícia concluída! Você pode escolher outro trajeto e confirmar uma nova demonstração.</p>}
@@ -159,6 +162,7 @@ export default function OperationalDemo({ scope, initialRole, onBack }: { scope:
           <div className="demo-card-list">{visibleRides.map(ride => <article className="demo-ride" key={ride.id} aria-label={`Corrida ${ride.status}`}>
             <div className="demo-card-heading"><strong className="demo-badge">{ride.status}</strong><span>{ride.km.toLocaleString("pt-BR")} km · {ride.minutes} min fictícios</span></div>
             <div className="demo-route"><div><span>PARTIDA</span><p>{ride.origin}</p></div><div><span>CHEGADA</span><p>{ride.destination}</p></div></div>
+            <RouteMap origin={ride.origin} destination={ride.destination} />
             <dl className="demo-price"><div><dt>Valor da viagem</dt><dd>{money(ride.fare)}</dd></div><div><dt>Comissão ({ride.rate * 100}%)</dt><dd>− {money(round(ride.fare * ride.rate))}</dd></div><div className="demo-earning"><dt>Seu ganho após comissão</dt><dd>{money(round(ride.fare - round(ride.fare * ride.rate)))}</dd></div></dl>
             <p className="demo-help">Passageiro: {money(ride.fare + 1)} no total, incluindo R$ 1,00 de taxa.</p>
             <div className="demo-actions">
