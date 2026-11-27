@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import "./AuthExtras.css";
 import OperationalDemo from "./OperationalDemo";
 import type { User } from "@supabase/supabase-js";
 import { isAuthConfigured, supabase } from "../lib/supabase";
@@ -12,6 +13,30 @@ const profileOptions: Record<AccountRole, { label: string; description: string; 
   "Parceiro local": { label: "Representante de negócio local", description: "Represento um negócio e tenho interesse em oferecer serviços ou benefícios.", welcome: "Seu perfil registra interesse em oferecer serviços ou benefícios à comunidade. Uma parceria dependerá de avaliação e acordo posterior." },
   Universidade: { label: "Representante de universidade", description: "Represento uma instituição e tenho interesse em conhecer o piloto e possíveis parcerias.", welcome: "Seu perfil registra interesse institucional no piloto. Convênios e participação da universidade dependem de acordo posterior." },
 };
+
+function phoneDigits(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits.length > 11 && digits.startsWith("55") ? digits.slice(2) : digits;
+}
+function formatPhone(value: string) {
+  const digits = phoneDigits(value).slice(0, 11);
+  if (!digits) return "";
+  if (digits.length < 3) return `(${digits}`;
+  const rest = digits.slice(2);
+  const split = rest.length > 8 ? 5 : 4;
+  return `(${digits.slice(0, 2)}) ${rest.slice(0, split)}${rest.length > split ? "-" + rest.slice(split) : ""}`;
+}
+function validPhone(value: string) {
+  return !value.trim() || /^[1-9]{2}[2-9]\d{7,8}$/.test(phoneDigits(value));
+}
+function PhoneField({ value, onChange, disabled = false }: { value: string; onChange: (value: string) => void; disabled?: boolean }) {
+  return <label className="auth-field"><span>Telefone de contato (opcional)</span><input aria-label="Telefone de contato (opcional)" type="tel" inputMode="tel" autoComplete="tel-national" placeholder="(84) 99999-9999" value={value} onChange={event => onChange(formatPhone(event.target.value))} disabled={disabled} maxLength={16}/><small className="auth-contact-help">Informe o DDD. O acesso à conta continua sendo por e-mail.</small></label>;
+}
+function PasswordGuide({ value, confirmation }: { value: string; confirmation: string }) {
+  const score = Number(value.length >= 8) + Number(value.length >= 12) + Number(/[a-z]/.test(value) && /[A-Z]/.test(value)) + Number(/\d/.test(value)) + Number(/[^a-zA-Z0-9]/.test(value));
+  const level = value.length < 8 ? "Curta" : score >= 4 ? "Forte" : score >= 3 ? "Boa" : "Básica";
+  return <div className="auth-password-guide"><div className="auth-strength-track" aria-hidden="true"><span style={{ width: `${value ? Math.max(12, score * 20) : 0}%`, background: value.length < 8 ? "#b76b22" : score >= 4 ? "#207950" : "#137cbe" }}/></div><p>{value ? `Força da senha: ${level}. ` : ""}Use pelo menos 8 caracteres. Uma senha longa com letras, números e símbolos é mais forte.</p>{confirmation && <p role="status">{value === confirmation ? "As senhas coincidem." : "As senhas ainda não coincidem."}</p>}</div>;
+}
 
 function validRole(value: unknown): AccountRole {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(profileOptions, value)
@@ -85,6 +110,7 @@ function PasswordInput({
       <span>{label}</span>
       <span className="auth-password-wrap">
         <input
+          aria-label={label}
           type={visible ? "text" : "password"}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -92,7 +118,7 @@ function PasswordInput({
           minLength={minLength}
           required
         />
-        <button type="button" onClick={() => setVisible(!visible)}>
+        <button type="button" aria-pressed={visible} onClick={() => setVisible(!visible)}>
           {visible ? "Ocultar" : "Mostrar"}
         </button>
       </span>
@@ -117,6 +143,8 @@ function errorMessage(error: unknown) {
     return "Muitas tentativas em pouco tempo. Aguarde um pouco e tente novamente.";
   }
 
+  if (normalized.includes("fetch") || normalized.includes("network")) return "Falha de conexão. Verifique sua internet e tente novamente.";
+
   return "Não foi possível concluir agora. Confira os dados e tente novamente.";
 }
 
@@ -134,9 +162,12 @@ export default function AuthDialog({
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [role, setRole] = useState<AccountRole>(initialRole);
   const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [confirmHelp, setConfirmHelp] = useState(false);
+  const [resendWait, setResendWait] = useState(0);
   const [organization, setOrganization] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
-  const [savedProfile, setSavedProfile] = useState<{ role: AccountRole; organization: string } | null>(null);
+  const [savedProfile, setSavedProfile] = useState<{ role: AccountRole; organization: string; fullName: string; phone: string } | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -147,6 +178,8 @@ export default function AuthDialog({
   useEffect(() => {
     setDemoOpen(initialDemo && Boolean(user));
     if (open) {
+      if (!user) { setFullName(""); setPhone(""); }
+      setConfirmHelp(false);
       setError("");
       setNotice("");
       setPassword("");
@@ -173,6 +206,12 @@ export default function AuthDialog({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [onClose, open]);
 
+  useEffect(() => {
+    if (!open || resendWait <= 0) return;
+    const timer = window.setTimeout(() => setResendWait(value => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [open, resendWait]);
+
   if (!open) return null;
 
   function changeMode(nextMode: AuthMode) {
@@ -186,6 +225,7 @@ export default function AuthDialog({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     setError("");
     setNotice("");
 
@@ -194,6 +234,15 @@ export default function AuthDialog({
       return;
     }
 
+    if (mode === "signup" && fullName.trim().length < 2) {
+      setError("Informe seu nome com pelo menos 2 caracteres."); return;
+    }
+    if (mode === "signup" && !validPhone(phone)) {
+      setError("Informe um telefone válido com DDD ou deixe o campo vazio."); return;
+    }
+    if ((mode === "signup" || mode === "update-password") && password.length < 8) {
+      setError("A senha deve ter pelo menos 8 caracteres."); return;
+    }
     if (mode === "signup" && representsOrganization(role) && !organization.trim()) {
       setError(role === "Universidade" ? "Informe o nome da instituição." : "Informe o nome do negócio.");
       return;
@@ -212,10 +261,10 @@ export default function AuthDialog({
       if (mode === "signup") {
         const interests = pendingInterest ? [pendingInterest] : [];
         const { data, error: signupError } = await supabase.auth.signUp({
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           password,
           options: {
-            data: { full_name: fullName.trim(), role, interests, organization_name: representsOrganization(role) ? organization.trim() : null },
+            data: { full_name: fullName.trim(), contact_phone: phone.trim() ? "+55" + phoneDigits(phone) : null, role, interests, organization_name: representsOrganization(role) ? organization.trim() : null },
             emailRedirectTo: window.location.origin,
           },
         });
@@ -227,6 +276,8 @@ export default function AuthDialog({
           setNotice(
             "Enviamos um link de confirmação para seu e-mail. Confirme o endereço para ativar sua conta.",
           );
+          setResendWait(60);
+          setConfirmHelp(true);
           setPassword("");
           setPasswordConfirm("");
           setMode("login");
@@ -234,13 +285,13 @@ export default function AuthDialog({
         }
       } else if (mode === "login") {
         const { error: loginError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           password,
         });
         if (loginError) throw loginError;
         changeMode("account");
       } else if (mode === "forgot") {
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
           redirectTo: `${window.location.origin}/?auth=update-password`,
         });
         if (resetError) throw resetError;
@@ -258,20 +309,40 @@ export default function AuthDialog({
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     } catch (submitError) {
+      if (submitError instanceof Error && submitError.message.toLowerCase().includes("email not confirmed")) setConfirmHelp(true);
       setError(errorMessage(submitError));
     } finally {
       setBusy(false);
     }
   }
 
+  async function resendConfirmation() {
+    if (busy || resendWait > 0 || !supabase) return;
+    setError(""); setNotice("");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Preencha o e-mail da sua conta antes de reenviar a confirmação."); return;
+    }
+    setBusy(true);
+    try {
+      const { error: resendError } = await supabase.auth.resend({ type: "signup", email: email.trim().toLowerCase(), options: { emailRedirectTo: window.location.origin } });
+      if (resendError) throw resendError;
+      setResendWait(60);
+      setNotice("Se houver um cadastro pendente para este e-mail, enviaremos um novo link. Confira também o spam.");
+    } catch (resendError) { setError(errorMessage(resendError)); }
+    finally { setBusy(false); }
+  }
+
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     setError("");
     setNotice("");
     if (!supabase || !user) {
       setError("Entre na sua conta para corrigir o perfil.");
       return;
     }
+    if (fullName.trim().length < 2) { setError("Informe seu nome com pelo menos 2 caracteres."); return; }
+    if (!validPhone(phone)) { setError("Informe um telefone válido com DDD ou deixe o campo vazio."); return; }
     if (representsOrganization(role) && !organization.trim()) {
       setError(role === "Universidade" ? "Informe o nome da instituição." : "Informe o nome do negócio.");
       return;
@@ -279,11 +350,11 @@ export default function AuthDialog({
     setBusy(true);
     try {
       const { data, error: profileError } = await supabase.auth.updateUser({
-        data: { role, organization_name: representsOrganization(role) ? organization.trim() : null },
+        data: { full_name: fullName.trim(), contact_phone: phone.trim() ? "+55" + phoneDigits(phone) : null, role, organization_name: representsOrganization(role) ? organization.trim() : null },
       });
       if (profileError) throw profileError;
       if (!data.user) throw new Error("Perfil não retornado");
-      setSavedProfile({ role: validRole(data.user.user_metadata.role), organization: data.user.user_metadata.organization_name || "" });
+      setSavedProfile({ role: validRole(data.user.user_metadata.role), organization: data.user.user_metadata.organization_name || "", fullName: data.user.user_metadata.full_name || "", phone: data.user.user_metadata.contact_phone || "" });
       setEditingProfile(false);
       setNotice("Perfil atualizado com sucesso.");
     } catch {
@@ -294,6 +365,7 @@ export default function AuthDialog({
   }
 
   async function signOut() {
+    if (busy) return;
     if (!supabase) return;
     setBusy(true);
     const { error: signOutError } = await supabase.auth.signOut();
@@ -308,7 +380,8 @@ export default function AuthDialog({
   const interests = Array.isArray(user?.user_metadata?.interests)
     ? (user.user_metadata.interests as string[])
     : [];
-  const accountName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Sua conta";
+  const accountName = savedProfile?.fullName ?? (user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Sua conta");
+  const accountPhone = savedProfile?.phone ?? (typeof user?.user_metadata?.contact_phone === "string" ? user.user_metadata.contact_phone : "");
   const accountRole = savedProfile?.role ?? validRole(user?.user_metadata?.role);
   const accountOrganization = savedProfile?.organization ?? (typeof user?.user_metadata?.organization_name === "string" ? user.user_metadata.organization_name : "");
 
@@ -337,21 +410,25 @@ export default function AuthDialog({
             <p className="auth-intro">
               Seu perfil: {profileOptions[accountRole].label}.
             </p>
-            <p className="auth-email">{user.email}</p>
+            <div className="auth-account-card"><span className="auth-avatar" aria-hidden="true">{String(accountName).trim().split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase()}</span><div><strong>{accountName}</strong><span>{user.email}</span><small>{user.email_confirmed_at ? "E-mail confirmado" : "Confirmação de e-mail pendente"}</small></div></div>
+            <p className="auth-muted"><strong>Telefone:</strong> {accountPhone ? formatPhone(accountPhone) : "Não informado"}</p>
             <p className="auth-muted">{profileOptions[accountRole].welcome}</p>
             {representsOrganization(accountRole) && accountOrganization && (
               <p className="auth-muted"><strong>{accountRole === "Universidade" ? "Instituição" : "Negócio"}:</strong> {accountOrganization}</p>
             )}
             {editingProfile ? (
               <form className="auth-form" onSubmit={saveProfile}>
+                <label className="auth-field"><span>Nome</span><input autoComplete="name" value={fullName} onChange={event => setFullName(event.target.value)} minLength={2} maxLength={100} required disabled={busy}/></label>
+                <PhoneField value={phone} onChange={setPhone} disabled={busy}/>
+                <label className="auth-field"><span>E-mail de acesso</span><input type="email" value={user.email || ""} readOnly disabled/><small className="auth-contact-help">Seu e-mail de acesso é mantido nesta edição.</small></label>
                 <ProfileFields role={role} organization={organization} onRoleChange={setRole} onOrganizationChange={setOrganization} disabled={busy} />
                 <button className="primary full" type="submit" disabled={busy}>{busy ? "Salvando perfil…" : "Salvar perfil"}</button>
                 <button className="auth-text-button full" type="button" disabled={busy} onClick={() => { setEditingProfile(false); setError(""); }}>Cancelar</button>
               </form>
             ) : (
               <button className="auth-secondary full" type="button" disabled={busy} onClick={() => {
-                setRole(accountRole); setOrganization(accountOrganization); setEditingProfile(true); setError(""); setNotice("");
-              }}>Corrigir meu perfil</button>
+                setFullName(String(accountName)); setPhone(formatPhone(accountPhone)); setRole(accountRole); setOrganization(accountOrganization); setEditingProfile(true); setError(""); setNotice("");
+              }}>Editar meus dados</button>
             )}
             {notice && (
               <p className="auth-message success" role="status">
@@ -410,6 +487,8 @@ export default function AuthDialog({
                   value={fullName}
                   onChange={(event) => setFullName(event.target.value)}
                   autoComplete="name"
+                  minLength={2}
+                  maxLength={100}
                   required
                 />
               </label>
@@ -423,6 +502,7 @@ export default function AuthDialog({
                   required
                 />
               </label>
+              <PhoneField value={phone} onChange={setPhone} disabled={busy}/>
               <ProfileFields role={role} organization={organization} onRoleChange={setRole} onOrganizationChange={setOrganization} disabled={busy} />
               <PasswordInput
                 label="Senha (mínimo 8 caracteres)"
@@ -438,6 +518,7 @@ export default function AuthDialog({
                 autoComplete="new-password"
                 minLength={8}
               />
+              <PasswordGuide value={password} confirmation={passwordConfirm}/>
               {error && (
                 <p className="auth-message error" role="alert">
                   {error}
@@ -528,6 +609,7 @@ export default function AuthDialog({
                 autoComplete="new-password"
                 minLength={8}
               />
+              <PasswordGuide value={password} confirmation={passwordConfirm}/>
               {error && (
                 <p className="auth-message error" role="alert">
                   {error}
@@ -589,6 +671,10 @@ export default function AuthDialog({
                 {busy ? "Entrando…" : "Entrar"}
               </button>
             </form>
+            <div className="auth-confirm-help">
+              <button className="auth-text-button" type="button" aria-expanded={confirmHelp} onClick={() => setConfirmHelp(value => !value)}>Não recebeu o e-mail de confirmação?</button>
+              {confirmHelp && <div><p>Preencha seu e-mail no campo acima. Confira o spam ou solicite outro link, sem precisar informar a senha.</p><button className="auth-secondary full" type="button" disabled={busy || resendWait > 0 || !isAuthConfigured} onClick={resendConfirmation}>{resendWait > 0 ? `Reenviar em ${resendWait}s` : busy ? "Enviando…" : "Reenviar confirmação"}</button></div>}
+            </div>
             <p className="auth-switch">
               Ainda não tem conta?{" "}
               <button type="button" onClick={() => changeMode("signup")}>
