@@ -27,7 +27,10 @@ Vite 8, Tailwind CSS 4 e Supabase Auth.
 
 Preserve os fluxos existentes, a identidade visual e o suporte ao celular.
 Simular viagens e acessar a demonstração exigem uma conta autenticada.
-Os cenários de demonstração são fictícios e guardados no navegador por conta e perfil.
+Os cenários de demonstração são fictícios e guardados no navegador por conta.
+Passageiro e motorista usam a mesma viagem; preserve a máquina de estados e os cálculos
+centralizados em `src/components/demoScenario.ts`. A central da banca não é um admin real.
+Execute também `node --test src/components/demoScenario.test.mjs` ao alterar esses fluxos.
 Use somente chaves públicas nas variáveis `VITE_*`; não versionar `.env.local` ou senhas.
 Não altere o PDF do plano de negócios sem um pedido específico.
 
