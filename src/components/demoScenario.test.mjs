@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 const compiled = ts.transpileModule(await readFile(new URL('./demoScenario.ts', import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext } }).outputText;
-const { initialScenario, transition, quote, ledger, candidates, transitionForRole, demoRoleForAccount } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { initialScenario, transition, quote, ledger, candidates, transitionForRole, demoRoleForAccount, driverOfferBlockers } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const choice = { route: 0, category: 'Essencial', women: false, payment: 'Pix', cash: 0, coupon: false };
 const action = (s, a) => transition(s, a, '2026-11-27T12:00:00Z');
 function ready() { let s = initialScenario(); for (const a of [{ type: 'documents' }, { type: 'approve', approved: true }, { type: 'selfie' }, { type: 'online' }, { type: 'verify' }]) s = action(s, a).state; return s; }
@@ -38,7 +38,7 @@ test('cancelled trip never pays; cash is deducted from settlement and not withdr
  assert.equal(action(ready(), { type: 'request', choice: { ...choice, payment: 'Dinheiro', cash: 1 }, id: 'a', pin: '1111' }).error, true);
 });
 test('matching respects women, vehicle capacity, destination and refusal', () => {
- let s = request(ready(), { women: true, category: 'Mais espaço' }); assert.equal(candidates(s, s.trips[0])[0].id, 'bia'); s = action(s, { type: 'decline' }).state; assert.equal(s.trips[0].status, 'Solicitada'); assert.equal(candidates(s, s.trips[0]).length, 0);
+ let s = request(ready(), { women: true, category: 'Mais espaço' }); assert.equal(candidates(s, s.trips[0])[0].id, 'bia'); s = action(s, { type: 'decline' }).state; assert.equal(s.trips[0].status, 'Cancelada'); assert.equal(candidates(s, s.trips[0]).length, 0);
  s = request(ready()); s = action(s, { type: 'destination', value: 'Praias urbanas' }).state; assert.equal(candidates(s, s.trips[0]).length, 0); s = action(s, { type: 'destination', value: 'Tirol' }).state; assert.equal(candidates(s, s.trips[0])[0].id, 'ana');
 });
 test('chat, ratings, support and alerts follow the same trip and selected profile', () => {
@@ -72,4 +72,29 @@ test('driver receives the fictional passenger PIN after arrival and support only
  s = action(s, { type: 'ticket', role: 'passenger', reason: 'Teste', text: 'Somente passageiro', id: 'private-ticket' }).state;
  assert.equal(transitionForRole(s, 'driver', { type: 'simulate-support', id: 'private-ticket' }).error, true);
  assert.equal(transitionForRole(s, 'passenger', { type: 'simulate-support', id: 'private-ticket' }).state.tickets[0].status, 'Resolvido');
+});
+
+test('last compatible refusal ends the request and a new request can be received without earnings', () => {
+ let s = request(ready());
+ for (let i = 0; i < 3; i++) { const r = transitionForRole(s, 'driver', { type: 'decline' }); assert.notEqual(r.error, true); s = r.state; }
+ assert.equal(s.trips[0].status, 'Cancelada'); assert.equal(s.trips[0].paid, false); assert.equal(ledger(s).net, 0);
+ const r = transitionForRole(s, 'driver', { type: 'receive', choice, id: 'new-request', pin: '1234' });
+ assert.notEqual(r.error, true); assert.equal(r.state.current, 'new-request'); assert.equal(r.state.trips.length, 2); assert.equal(candidates(r.state,r.state.trips[0]).length, 3);
+});
+test('legacy stuck requests recover and filter mismatch cannot bypass an active request', () => {
+ let s = request(ready()); s = { ...s, trips: s.trips.map(t => ({ ...t, declined: ['ana','carlos','bia'] })) };
+ const recovered = transitionForRole(s, 'driver', { type: 'receive', choice, id: 'recovered', pin: '1234' });
+ assert.notEqual(recovered.error, true); assert.equal(recovered.state.current, 'recovered'); assert.equal(recovered.state.trips.find(t => t.id === 'trip-1').status, 'Cancelada');
+ s = action(request(ready()), { type: 'destination', value: 'Lagoa Nova' }).state;
+ assert.match(driverOfferBlockers(s,s.trips[0]).join(' '), /Lagoa Nova.*Tirol/);
+ const same = transitionForRole(s, 'driver', { type: 'receive', choice, id: 'duplicate', pin: '1234' }); assert.equal(same.state.current, 'trip-1');
+ s = transitionForRole(s, 'driver', { type: 'destination', value: 'Qualquer destino' }).state;
+ assert.equal(driverOfferBlockers(s,s.trips[0]).length, 0); assert.notEqual(transitionForRole(s, 'driver', { type: 'accept' }).error, true);
+});
+test('documents, analysis result, selfie and availability complete in one driver workspace', () => {
+ let s=initialScenario(); const steps=[{type:'documents'},{type:'approve',approved:true},{type:'selfie'},{type:'online'}];
+ for(const a of steps) { const r=transitionForRole(s,'driver',a); assert.notEqual(r.error,true,r.message); s=r.state; }
+ assert.equal(s.documents,'Aprovado'); assert.equal(s.selfie,true); assert.equal(s.online,true);
+ s=transitionForRole(s,'driver',{type:'receive',choice,id:'driver-only',pin:'1234'}).state; assert.deepEqual(driverOfferBlockers(s,s.trips[0]),[]);
+ s=action(s,{type:'cancel'}).state; assert.equal(ledger(s).net,0);
 });

@@ -34,6 +34,16 @@ export function quote(config: Config, choice: Choice): Quote {
 export function candidates(s: Scenario, t: Trip) {
   return drivers.filter(d => !t.declined.includes(d.id) && (!t.women || d.woman) && (t.category !== 'Mais espaço' || d.id === 'bia') && (s.destination === 'Qualquer destino' || t.zone === s.destination)).sort((a, b) => a.pickup - b.pickup);
 }
+export function driverOfferBlockers(s: Scenario, t: Trip): string[] {
+  if (t.status !== 'Solicitada') return [];
+  const reasons: string[] = [];
+  if (s.documents !== 'Aprovado') reasons.push('Conclua a análise fictícia dos documentos em Preparar para dirigir.');
+  else if (!s.selfie) reasons.push('Simule a checagem facial do turno em Preparar para dirigir.');
+  if (!s.online) reasons.push('Seu turno está fora de operação. Após a verificação, clique em Ficar disponível.');
+  if (s.destination !== 'Qualquer destino' && s.destination !== t.zone) reasons.push(`Seu filtro é ${s.destination}, mas esta viagem termina em ${t.zone}. Limpe o filtro para responder a este pedido.`);
+  else if (!candidates(s, t).length) reasons.push('Todos os candidatos compatíveis recusaram este pedido. Encerre-o ou simule o recebimento de um novo pedido.');
+  return reasons;
+}
 export function ledger(s: Scenario, driverId?: string) {
   const done = s.trips.filter(t => t.status === 'Concluída' && (!driverId || t.assigned === driverId));
   const net = round(done.reduce((v, t) => v + t.quote.net, 0));
@@ -65,15 +75,21 @@ export function transition(s: Scenario, a: Action, at = new Date().toISOString()
   const changeTrip = (next: Trip, message: string) => ok({ trips: s.trips.map(v => v.id === next.id ? { ...next, events: [...next.events, { at, text: message }] } : v) }, message);
   switch (a.type) {
     case 'verify': return ok({ passengerVerified: true }, 'Identidade fictícia do passageiro validada. Nenhum documento real foi coletado.');
-    case 'documents': return ok({ documents: 'Em análise', selfie: false, online: false }, 'CNH, veículo e antecedentes fictícios enviados. Abra Configurações da simulação para aprovar o cadastro.');
+    case 'documents': return ok({ documents: 'Em análise', selfie: false, online: false }, 'CNH, veículo e antecedentes fictícios enviados. No próprio painel, clique em Simular resultado da análise para receber a atualização fictícia e liberar a selfie.');
     case 'approve': if (s.documents !== 'Em análise') return fail('Envie os documentos fictícios no seu painel antes da análise.'); return ok({ documents: a.approved ? 'Aprovado' : 'Rejeitado', online: false, selfie: false }, a.approved ? 'Cadastro fictício aprovado. O motorista pode simular a selfie e ficar disponível.' : 'Cadastro fictício rejeitado. O motorista pode reenviar os exemplos.');
-    case 'selfie': if (s.documents !== 'Aprovado') return fail('Aguarde a aprovação dos documentos em Configurações da simulação.'); return ok({ selfie: true }, 'Checagem facial fictícia aprovada para este turno. Sem câmera ou reconhecimento real.');
+    case 'selfie': if (s.documents !== 'Aprovado') return fail('Simule o resultado da análise dos documentos no próprio painel para liberar a selfie.'); return ok({ selfie: true }, 'Checagem facial fictícia aprovada para este turno. Sem câmera ou reconhecimento real.');
     case 'online': if (s.documents !== 'Aprovado' || !s.selfie) return fail('Conclua a aprovação e a selfie fictícia antes de ficar disponível.'); if (t && ['Aceita', 'Em andamento'].includes(t.status) && s.online) return fail('Finalize ou cancele a viagem antes de encerrar o turno.'); return ok({ online: !s.online, selfie: s.online ? false : s.selfie }, s.online ? 'Turno encerrado. Uma nova selfie fictícia será necessária.' : 'Motorista disponível na demonstração.');
     case 'destination': return ok({ destination: a.value }, 'Filtro de destino atualizado para os próximos pedidos.');
     case 'settings': if (!Number.isFinite(a.config.perKm) || a.config.perKm <= 0 || a.config.perKm > 10 || !Number.isFinite(a.config.fee) || a.config.fee < 0 || a.config.fee > 5 || ![0, .03].includes(a.config.rate) || !['normal', 'alta', 'pico'].includes(a.config.demand)) return fail('Use tarifa entre R$ 0,01 e R$ 10, taxa entre R$ 0 e R$ 5 e comissão de 0% ou 3%.'); return ok({ config: a.config }, 'Premissas salvas apenas na demonstração. Viagens já confirmadas mantêm o preço e a comissão originais.');
     case 'request': case 'receive': {
       if (s.trips.some(isActive)) {
-        if (a.type === 'receive' && t?.status === 'Solicitada') return ok({}, 'O pedido do passageiro já está disponível aqui. É o mesmo pedido no acompanhamento da viagem.');
+        if (a.type === 'receive' && t?.status === 'Solicitada') {
+          if (!candidates({ ...s, destination: 'Qualquer destino' }, t).length) {
+            const closed = transition(s, { type: 'cancel' }, at);
+            return transition(closed.state, a, at);
+          }
+          return ok({}, 'Já existe um pedido aguardando sua resposta. Confira os requisitos ao lado de Aceitar e Recusar.');
+        }
         return fail('Há uma viagem em aberto. Conclua ou cancele antes de criar outra.');
       }
       if (a.type === 'request' && !s.passengerVerified) return fail('Simule a validação de identidade antes de confirmar.');
@@ -96,7 +112,9 @@ export function transition(s: Scenario, a: Action, at = new Date().toISOString()
       if (!s.online) return fail('Fique disponível antes de responder ao pedido.');
       const driver = candidates(s, t)[0];
       if (!driver) return fail('Não há candidato elegível para recusar.');
-      return changeTrip({ ...t, declined: [...t.declined, driver.id] }, `Pedido recusado por ${driver.name}. A solicitação continua aberta para o próximo candidato fictício.`);
+      const declined = { ...t, declined: [...t.declined, driver.id] };
+      if (!candidates({ ...s, destination: 'Qualquer destino' }, declined).length) return changeTrip({ ...declined, status: 'Cancelada', paid: false }, 'Pedido encerrado sem cobrança: todos os candidatos compatíveis recusaram. Clique em Simular recebimento de pedido para começar outro.');
+      return changeTrip(declined, `Pedido recusado por ${driver.name}. A solicitação continua aberta para o próximo candidato fictício.`);
     }
     case 'start': if (!t || t.status !== 'Aceita') return fail('Aceite a corrida antes de iniciar.'); if (t.pickup < 100) return fail('Simule a chegada ao embarque antes de iniciar.'); if (a.pin !== t.pin) return fail('PIN incorreto. Confira os quatro dígitos informados pelo passageiro fictício.'); return changeTrip({ ...t, status: 'Em andamento', progress: 0 }, 'PIN confirmado. Corrida fictícia iniciada.');
     case 'move': if (!t || !['Aceita', 'Em andamento'].includes(t.status)) return fail('Aceite uma corrida para simular o deslocamento.'); if (t.status === 'Aceita') return changeTrip({ ...t, pickup: Math.min(100, t.pickup + 50) }, t.pickup >= 50 ? 'Veículo fictício chegou ao ponto de embarque.' : 'Veículo fictício a caminho do embarque.'); return changeTrip({ ...t, progress: Math.min(100, t.progress + 25) }, 'Posição fictícia atualizada no mapa da viagem.');
