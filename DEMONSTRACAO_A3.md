@@ -18,12 +18,13 @@ Para apresentar perfis diferentes, use contas distintas, uma de cada perfil. A d
 
 ### Conta de motorista
 
-1. Simule o envio dos documentos. Abra **Simular análise do cadastro / Configurações da simulação** e aprove os exemplos fictícios.
-2. Volte a **Viagem e painel**, simule a selfie e clique em **Ficar disponível**.
-3. Use **Simular recebimento de pedido**. Confira o trajeto, valor, comissão e ganho; aceite ou recuse. A recusa oferece o pedido ao próximo candidato fictício.
+1. Em **Preparar para dirigir**, simule o envio dos documentos e clique em **Simular resultado da análise**. A aprovação fictícia aparece no próprio painel e libera a selfie; não é preciso abrir a central da banca.
+2. Simule a checagem facial do turno e clique em **Ficar disponível**.
+3. Use **Simular recebimento de pedido**. Confira o trajeto, valor, comissão e ganho; aceite ou recuse. A recusa oferece o pedido ao próximo candidato fictício. Quando todos recusam, o pedido é encerrado sem cobrança e você pode simular outro. Pedidos antigos que ficaram presos também são encerrados ao simular um novo recebimento.
 4. Simule o deslocamento ao embarque duas vezes. Use **Simular passageiro informando o PIN**, digite os quatro dígitos recebidos e inicie. PIN incorreto continua bloqueando o início.
 5. Avance o percurso quatro vezes e conclua. Consulte histórico, ganhos, avaliações e saque Pix fictício. Chat e suporte têm respostas simuladas no próprio painel.
-6. As configurações de apresentação deste perfil permitem variar as premissas e testar a análise fictícia de documentos e alertas. Não são permissões administrativas reais.
+6. Se os botões de aceitar/recusar estiverem bloqueados, leia o motivo exibido junto deles. Para um pedido que termina em Tirol, um filtro de Lagoa Nova impede a resposta; use **Limpar filtro de destino**. Você também pode usar **Encerrar pedido fictício** antes do aceite.
+7. As configurações de apresentação deste perfil permitem variar as premissas e revisar alertas. Não são permissões administrativas reais.
 
 ### Conta de parceiro local
 
@@ -57,6 +58,10 @@ O cenário fica no armazenamento local deste navegador, separado pelo ID da cont
 
 Registros da demonstração anterior continuam disponíveis no histórico legado; não entram nos ganhos do novo cenário. As ofertas existentes foram preservadas na conta de parceiro. Não há publicação dessas ofertas em outras contas da demonstração. O login e a área **Quero viajar** da página inicial foram mantidos.
 
+## Equipe
+
+João Moura, Leandro Luis, Dayvid Ramos, João Gabriel, Raied Lucas e Mario Lucio.
+
 ## Verificação técnica
 
 ```sh
@@ -65,4 +70,4 @@ pnpm exec tsc --noEmit
 node --test src/components/demoScenario.test.mjs
 ```
 
-Os testes cobrem permissões do turno fictício, identidade, tarifas e subsídios, preço preservado, duplicação de pedido, PIN e ordem das etapas, conclusão única, saldo por motorista, dinheiro/troco, saque duplicado, pareamento, chat, avaliações e suporte.
+Os testes também verificam a recuperação após recusas, pedidos presos da versão anterior, motivos de bloqueio por filtro e a sequência de documentos/selfie no mesmo painel. Os testes cobrem permissões do turno fictício, identidade, tarifas e subsídios, preço preservado, duplicação de pedido, PIN e ordem das etapas, conclusão única, saldo por motorista, dinheiro/troco, saque duplicado, pareamento, chat, avaliações e suporte.
