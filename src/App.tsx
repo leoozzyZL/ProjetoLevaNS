@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import AuthDialog, { type AccountRole, type AuthMode } from "./components/AuthDialog";
 import { supabase } from "./lib/supabase";
+import { estimateTrip, type TripEstimate } from "./lib/tripRouting";
+import RouteMap from "./components/RouteMap";
 
 type IconName =
   | "arrow"
@@ -242,133 +244,6 @@ const references = [
   "Reclame Aqui / Cobrança 99",
   "Reclame Aqui / Bloqueio Uber",
 ];
-
-type PlaceCoordinates = {
-  lat: number;
-  lon: number;
-};
-
-type GeocodedPlace = PlaceCoordinates & {
-  label: string;
-};
-
-type TripEstimate = {
-  origin: string;
-  destination: string;
-  distanceKm: number;
-  durationMinutes: number;
-  fare: number;
-  serviceFee: number;
-  price: number;
-};
-
-const SERVICE_FEE = 1;
-const DEMO_PRICE_PER_KM = 2;
-
-const NATAL_CENTER: PlaceCoordinates = { lat: -5.78, lon: -35.20 };
-const NATAL_BOUNDS = { west: -35.32, south: -5.95, east: -35.12, north: -5.66 };
-
-function normalizePlaceName(value = "") {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLocaleLowerCase("pt-BR");
-}
-
-async function geocodePlace(query: string, bias?: PlaceCoordinates): Promise<GeocodedPlace> {
-  const url = new URL("https://photon.komoot.io/api/");
-  url.searchParams.set("q", query.trim());
-  url.searchParams.set("limit", "5");
-  url.searchParams.set("lang", "default");
-  url.searchParams.set("countrycode", "br");
-  url.searchParams.set("bbox", NATAL_BOUNDS.west + "," + NATAL_BOUNDS.south + "," + NATAL_BOUNDS.east + "," + NATAL_BOUNDS.north);
-  url.searchParams.set("lat", String(bias?.lat ?? NATAL_CENTER.lat));
-  url.searchParams.set("lon", String(bias?.lon ?? NATAL_CENTER.lon));
-  url.searchParams.set("location_bias_scale", "0.1");
-
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Não foi possível localizar esse endereço.");
-
-  const data = (await response.json()) as {
-    features?: Array<{
-      geometry?: { coordinates?: [number, number] };
-      properties?: {
-        name?: string;
-        district?: string;
-        city?: string;
-        county?: string;
-        state?: string;
-        country?: string;
-        countrycode?: string;
-      };
-    }>;
-  };
-  const feature = data.features?.find((result) => {
-    const properties = result.properties ?? {};
-    const coordinates = result.geometry?.coordinates;
-    const locality = properties.city ?? properties.county;
-    const inNatalBounds = Boolean(
-      coordinates &&
-      coordinates[0] >= NATAL_BOUNDS.west &&
-      coordinates[0] <= NATAL_BOUNDS.east &&
-      coordinates[1] >= NATAL_BOUNDS.south &&
-      coordinates[1] <= NATAL_BOUNDS.north,
-    );
-
-    return (
-      properties.countrycode?.toUpperCase() === "BR" &&
-      normalizePlaceName(locality) === "natal" &&
-      normalizePlaceName(properties.state) === "rio grande do norte" &&
-      inNatalBounds
-    );
-  });
-  const coordinates = feature?.geometry?.coordinates;
-  if (!feature || !coordinates || coordinates.length < 2) {
-    throw new Error("A simulação atende somente endereços de Natal, RN. Informe um local e seu bairro.");
-  }
-
-  const properties = feature.properties ?? {};
-  const label = [...new Set([properties.name, properties.district, properties.city ?? properties.county, properties.state].filter(Boolean))]
-    .join(", ") || query;
-
-  return { label, lon: coordinates[0], lat: coordinates[1] };
-}
-async function estimateTrip(origin: string, destination: string): Promise<TripEstimate> {
-  const originPlace = await geocodePlace(origin);
-  const destinationPlace = await geocodePlace(destination, originPlace);
-  const routeUrl = new URL(
-    "https://router.project-osrm.org/route/v1/driving/" +
-      originPlace.lon + "," + originPlace.lat + ";" + destinationPlace.lon + "," + destinationPlace.lat,
-  );
-  routeUrl.searchParams.set("overview", "false");
-
-  const response = await fetch(routeUrl);
-  if (!response.ok) throw new Error("Não foi possível calcular essa rota agora.");
-
-  const data = (await response.json()) as {
-    code?: string;
-    routes?: Array<{ distance: number; duration: number }>;
-  };
-  const route = data.routes?.[0];
-  if (data.code !== "Ok" || !route) {
-    throw new Error("Não encontramos uma rota de carro entre esses locais.");
-  }
-
-  const distanceKm = route.distance / 1000;
-  const fare = Math.round(distanceKm * DEMO_PRICE_PER_KM * 100) / 100;
-  const price = Math.round((fare + SERVICE_FEE) * 100) / 100;
-
-  return {
-    origin: originPlace.label,
-    destination: destinationPlace.label,
-    distanceKm,
-    durationMinutes: Math.max(1, Math.ceil(route.duration / 60)),
-    fare,
-    serviceFee: SERVICE_FEE,
-    price,
-  };
-}
 
 export default function App() {
   const [audience, setAudience] = useState<"passageiro" | "motorista">("passageiro");
@@ -681,6 +556,7 @@ export default function App() {
                       </strong>
                     </span>
                   </div>
+                  {tripEstimate && <RouteMap origin={tripEstimate.origin} destination={tripEstimate.destination} coordinates={tripEstimate.coordinates} />}
                   <h2>Estimativa de viagem</h2>
                   <p className="concept-note"><strong>Valor ilustrativo para demonstração.</strong><br />Simulação em Natal, RN. Não solicita uma corrida.</p>
                   <div className="ride-option">
