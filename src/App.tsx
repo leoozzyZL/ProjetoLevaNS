@@ -260,6 +260,10 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [referencesOpen, setReferencesOpen] = useState(false);
   const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(!supabase);
+  const signedInRole = authUser?.user_metadata?.role;
+  const heroAudience = authUser ? (signedInRole === "Motorista" ? "motorista" : "passageiro") : audience;
+  const isInstitutional = Boolean(authUser && signedInRole !== "Passageiro" && signedInRole !== "Motorista");
   const [authOpen, setAuthOpen] = useState(false);
   const [demoRequested, setDemoRequested] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
@@ -271,9 +275,11 @@ export default function App() {
 
     supabase.auth.getSession().then(({ data }) => {
       setAuthUser((current) => current ?? data.session?.user ?? null);
-    });
+      setAuthReady(true);
+    }).catch(() => setAuthReady(true));
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setAuthUser(session?.user ?? null);
+      setAuthReady(true);
       if (event === "PASSWORD_RECOVERY") {
         setAuthMode("update-password");
         setAuthOpen(true);
@@ -289,12 +295,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!authUser) {
-      setTrip(false);
-      setTripEstimate(null);
-      setTripError("");
-    }
-  }, [authUser?.id]);
+    setTrip(false);
+    setTripEstimate(null);
+    setTripError("");
+  }, [authUser?.id, signedInRole]);
 
   const filteredPartners = useMemo(
     () =>
@@ -325,6 +329,13 @@ export default function App() {
     setMenu(false);
   }
 
+  function openDemo() {
+    setDemoRequested(true);
+    setAuthMode(authUser ? "account" : "login");
+    setAuthOpen(true);
+    setMenu(false);
+  }
+
   async function recordInterest(interest: string, role: AccountRole = "Passageiro") {
     if (!authUser || !supabase) {
       openAuth("signup", role, interest);
@@ -347,6 +358,7 @@ export default function App() {
   async function submitTrip(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!authUser) { openAuth("login"); return; }
+    if (signedInRole !== "Passageiro") { showToast("A estimativa de viagem está disponível no perfil Passageiro."); return; }
     if (!origin.trim() || !destination.trim()) return;
 
     setTripLoading(true);
@@ -384,12 +396,7 @@ export default function App() {
           <button onClick={() => scrollTo("beneficios")}>Benefícios</button>
           <button onClick={() => scrollTo("seguranca")}>Segurança</button>
           <button onClick={() => scrollTo("planos")}>Planos</button>
-          <button onClick={() => {
-            setDemoRequested(true);
-            setAuthMode(authUser ? "account" : "login");
-            setAuthOpen(true);
-            setMenu(false);
-          }}>Demonstração</button>
+          <button onClick={openDemo}>Demonstração</button>
           {!authUser && (
             <button className="mobile-auth-link" onClick={() => openAuth("login")}>
               Entrar
@@ -452,7 +459,7 @@ export default function App() {
           </div>
 
           <div className="ride-card">
-            <div className="audience-switch" role="tablist" aria-label="Escolha seu perfil">
+            {!authUser ? <div className="audience-switch" role="tablist" aria-label="Escolha seu perfil">
               <button
                 className={audience === "passageiro" ? "active" : ""}
                 onClick={() => {
@@ -471,8 +478,8 @@ export default function App() {
               >
                 Quero dirigir
               </button>
-            </div>
-            {audience === "passageiro" ? (
+            </div> : <p className="commission-pill">Seu espaço de {String(signedInRole || "conta").toLocaleLowerCase("pt-BR")}</p>}
+            {isInstitutional ? <div className="driver-panel"><h2>{signedInRole === "Parceiro local" ? "Seu negócio na comunidade." : "Sua instituição na Leva Nós."}</h2><p>{signedInRole === "Parceiro local" ? "Cadastre e gerencie as ofertas do seu negócio no seu painel." : "Acompanhe seus dados e os interesses da instituição no projeto."}</p><button className="primary full" type="button" onClick={openDemo}>{signedInRole === "Parceiro local" ? "Gerenciar minhas ofertas" : "Abrir meu espaço institucional"}</button></div> : heroAudience === "passageiro" ? (
               !trip || !authUser ? (
                 <form onSubmit={submitTrip}>
                   <h2>Para onde vamos?</h2>
@@ -639,8 +646,8 @@ export default function App() {
                 <p style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 16 }}>
                   <b>Condição dos fundadores:</b> após os 90 dias, comissão de 3% garantida por 12 meses, mantendo avaliação igual ou superior a 4,8.
                 </p>
-                <button className="primary full" onClick={() => openAuth("signup", "Motorista")}>
-                  Quero dirigir <Icon name="arrow" />
+                <button className="primary full" onClick={() => authUser ? openDemo() : openAuth("signup", "Motorista")}>
+                  {authUser ? "Abrir meu painel de motorista" : "Quero dirigir"} <Icon name="arrow" />
                 </button>
                 <small className="availability" style={{ textAlign: "left" }}>
                   ¹Valores antes dos custos do motorista, como combustível e manutenção.
@@ -726,17 +733,17 @@ export default function App() {
                 </span>
                 <h3>{title}</h3>
                 <p>{text}</p>
-                <button
+                {(!authUser || signedInRole === ["Passageiro", "Motorista", "Parceiro local"][index]) && <button
                   onClick={() =>
                     index === 0
                       ? (setAudience("passageiro"), scrollTo("inicio"))
                       : index === 1
                         ? (setAudience("motorista"), scrollTo("inicio"))
-                        : openAuth("signup", "Parceiro local")
+                        : authUser ? openDemo() : openAuth("signup", "Parceiro local")
                   }
                 >
-                  {action} <Icon name="arrow" size={17} />
-                </button>
+                  {authUser && index === 2 ? "Gerenciar minhas ofertas" : action} <Icon name="arrow" size={17} />
+                </button>}
               </article>
             ))}
           </div>
@@ -976,12 +983,12 @@ export default function App() {
                     </li>
                   ))}
                 </ul>
-                <button
+                {(!authUser || signedInRole === "Motorista") && <button
                   className={index === 1 ? "primary full" : "secondary full"}
                   onClick={() => recordInterest(`Plano: ${name as string}`, "Motorista")}
                 >
                   Tenho interesse
-                </button>
+                </button>}
               </article>
             ))}
           </div>
@@ -1107,7 +1114,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="cta-section" id="cadastro">
+        {authReady && !authUser && <section className="cta-section" id="cadastro">
           <div className="route-art route-two">
             <span />
             <span />
@@ -1131,7 +1138,7 @@ export default function App() {
               Já tenho uma conta
             </button>
           </div>
-        </section>
+        </section>}
       </main>
 
       <footer>
@@ -1153,7 +1160,7 @@ export default function App() {
             <strong>Projeto</strong>
             <button onClick={() => scrollTo("planos")}>Planos</button>
             <button onClick={() => setReferencesOpen(!referencesOpen)}>Referências</button>
-            <button onClick={() => openAuth("signup")}>Participar</button>
+            {!authUser && <button onClick={() => openAuth("signup")}>Participar</button>}
           </div>
           <div className="academic-note">
             <strong>Projeto acadêmico</strong>
